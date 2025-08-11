@@ -12,3 +12,4 @@ tqdm>=4.66
 pandas>=2.2
 python-multipart>=0.0.9
 scikit-image>=0.22
+scipy>=1.10

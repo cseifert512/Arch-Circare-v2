@@ -40,7 +40,7 @@ def main(data_dir: str, model_name: str):
     projects = [p for p in glob.glob(os.path.join(img_root, "*")) if os.path.isdir(p)]
     image_paths = []
     for pdir in projects:
-        image_paths += glob.glob(os.path.join(pdir, "*.jpg")) + glob.glob(os.path.join(pdir, "*.png"))
+        image_paths += glob.glob(os.path.join(pdir, "*.jpg")) + glob.glob(os.path.join(pdir, "*.jpeg")) + glob.glob(os.path.join(pdir, "*.png"))
 
     print(f"[embed] Using data_dir: {data_dir}")
     print(f"[embed] Found {len(image_paths)} images in {len(projects)} project folders.", flush=True)
@@ -52,7 +52,7 @@ def main(data_dir: str, model_name: str):
         with open(idmap_path, "w") as f:
             json.dump(id_map, f)
         print("[embed] No images found. Wrote empty id_map.json. "
-              "Expected layout: data/images/<project_id>/*.jpg|*.png", flush=True)
+              "Expected layout: data/images/<project_id>/*.jpg|*.jpeg|*.png", flush=True)
         return
 
     model, tfm = load_model(model_name)
@@ -60,7 +60,7 @@ def main(data_dir: str, model_name: str):
     for idx, img_path in enumerate(tqdm(image_paths, desc="[embed] Embedding", unit="img")):
         project_id = pathlib.Path(img_path).parent.name
         base = pathlib.Path(img_path).stem
-        image_id = f"i_{base}"
+        image_id = f"i_{project_id}_{base}"
         try:
             pil = Image.open(img_path).convert("RGB")
         except Exception as e:

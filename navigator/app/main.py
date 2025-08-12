@@ -1,151 +1,98 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-import logging
-import pandas as pd
-from pathlib import Path
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from pydantic import BaseModel
+from typing import List
+import os, time
+import numpy as np
+import torch, timm
+from PIL import Image
 
-from .config import settings
-from .models import ErrorResponse
-from .routers import search, projects
-from .services.embedder import get_embedder
-from .services.index_store import get_index_store
-from .services.features.spatial import SpatialFeatures
-from .services.features.attributes import AttributeFeatures
-from .services.features.patches import PatchFeatures
-from .services.pipeline import Pipeline
+from app.faiss_service import FaissStore, l2n
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+DATA_DIR = os.getenv("DATA_DIR", "data")
+app = FastAPI(title="Design Precedent Navigator API", version="0.2.0")
 
-# Create FastAPI app
-app = FastAPI(
-    title="Design Precedent Navigator API",
-    description="API for searching architectural precedents by visual similarity",
-    version="0.1.0"
-)
+# ---- Lazy singletons ----
+_store: FaissStore | None = None
+_model = None
+_transform = None
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+def get_store() -> FaissStore:
+    global _store
+    if _store is None:
+        _store = FaissStore(DATA_DIR)
+    return _store
 
-# Global service instances
-_pipeline = None
-_metadata = None
+def get_model_and_transform():
+    global _model, _transform
+    if _model is None:
+        model_name = os.getenv("EMBED_MODEL", "vit_small_patch14_dinov2")
+        model = timm.create_model(model_name, pretrained=True)
+        model.eval(); model.reset_classifier(0)
+        cfg = timm.data.resolve_data_config({}, model=model)
+        _transform = timm.data.create_transform(**cfg, is_training=False)
+        _model = model
+    return _model, _transform
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize services on startup."""
-    global _pipeline, _metadata
-    
-    try:
-        logger.info("Starting Design Precedent Navigator API...")
-        
-        # Load metadata
-        if settings.metadata_csv.exists():
-            _metadata = pd.read_csv(settings.metadata_csv)
-            logger.info(f"Loaded metadata for {len(_metadata)} projects")
-        else:
-            logger.warning(f"Metadata file not found: {settings.metadata_csv}")
-            _metadata = pd.DataFrame()
-        
-        # Initialize embedder
-        embedder = get_embedder(settings.model_name)
-        logger.info("Embedder initialized")
-        
-        # Initialize index store
-        if settings.faiss_index_path.exists() and settings.idmap_path.exists():
-            index_store = get_index_store(settings.faiss_index_path, settings.idmap_path)
-            logger.info("Index store initialized")
-        else:
-            logger.warning("FAISS index not found - search functionality will be limited")
-            index_store = None
-        
-        # Initialize feature modules
-        spatial_features = SpatialFeatures(settings.plans_dir)
-        attribute_features = AttributeFeatures(str(settings.metadata_csv))
-        patch_features = PatchFeatures(settings.patch_embeddings_dir)
-        
-        logger.info("Feature modules initialized")
-        
-        # Initialize pipeline
-        if index_store:
-            _pipeline = Pipeline(
-                index_store=index_store,
-                spatial_features=spatial_features,
-                attribute_features=attribute_features,
-                patch_features=patch_features
-            )
-            logger.info("Search pipeline initialized")
-        
-        # Set global instances in routers
-        search.set_pipeline(_pipeline)
-        projects.set_metadata(_metadata)
-        
-        logger.info("API startup completed successfully")
-        
-    except Exception as e:
-        logger.error(f"Failed to initialize API: {e}")
-        raise
+def embed_pil(pil: Image.Image) -> np.ndarray:
+    model, tfm = get_model_and_transform()
+    with torch.no_grad():
+        x = tfm(pil.convert("RGB")).unsqueeze(0)
+        feat = model(x)
+        vec = feat.cpu().numpy().astype("float32")
+    return l2n(vec)[0]
+
+class SearchById(BaseModel):
+    image_id: str
+    top_k: int = 12
+
+class SearchByVector(BaseModel):
+    vector: List[float]
+    top_k: int = 12
 
 @app.get("/health")
-async def health_check():
-    """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "version": "0.1.0",
-        "services": {
-            "embedder": "initialized",
-            "index_store": "initialized" if _pipeline else "not_available",
-            "metadata": f"loaded_{len(_metadata)}_projects" if _metadata is not None else "not_loaded"
-        }
-    }
+def health():
+    return {"ok": True}
 
-@app.get("/")
-async def root():
-    """Root endpoint with API information."""
-    return {
-        "message": "Design Precedent Navigator API",
-        "version": "0.1.0",
-        "endpoints": {
-            "health": "/health",
-            "search": "/search",
-            "embed": "/embed",
-            "feedback": "/feedback",
-            "projects": "/projects",
-            "explain": "/explain/{project_id}"
-        },
-        "docs": "/docs"
-    }
+@app.post("/admin/reload-index")
+def reload_index():
+    try:
+        get_store().reload()
+        return {"ok": True, "msg": "Index reloaded."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-# Include routers
-app.include_router(search.router, prefix="/api/v1", tags=["search"])
-app.include_router(projects.router, prefix="/api/v1", tags=["projects"])
+@app.post("/search/id")
+def search_id(body: SearchById):
+    st = get_store()
+    try:
+        q = st.vector_for_image(body.image_id)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    t0 = time.time()
+    D, I = st.search(q, body.top_k)
+    ms = int((time.time() - t0) * 1000)
+    return {"latency_ms": ms, "results": st.results_payload(D, I)}
 
-# Global exception handler
-@app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
-    """Global exception handler for structured error responses."""
-    logger.error(f"Unhandled exception: {exc}")
-    return ErrorResponse(
-        error_code="INTERNAL_ERROR",
-        message="An internal error occurred",
-        details={"exception": str(exc)}
-    )
+@app.post("/search/vector")
+def search_vector(body: SearchByVector):
+    st = get_store()
+    q = np.array(body.vector, dtype="float32")
+    if q.ndim != 1:
+        raise HTTPException(status_code=400, detail="Vector must be 1-D")
+    t0 = time.time()
+    D, I = st.search(q, body.top_k)
+    ms = int((time.time() - t0) * 1000)
+    return {"latency_ms": ms, "results": st.results_payload(D, I)}
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(
-        "app.main:app",
-        host=settings.host,
-        port=settings.port,
-        reload=settings.debug
-    )
+@app.post("/search/file")
+async def search_file(file: UploadFile = File(...), top_k: int = 12):
+    st = get_store()
+    try:
+        pil = Image.open(file.file)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid image file.")
+    q = embed_pil(pil)
+    t0 = time.time()
+    D, I = st.search(q, top_k)
+    ms = int((time.time() - t0) * 1000)
+    return {"latency_ms": ms, "results": st.results_payload(D, I)}

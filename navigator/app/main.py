@@ -25,7 +25,7 @@ def get_store() -> FaissStore:
 def get_model_and_transform():
     global _model, _transform
     if _model is None:
-        model_name = os.getenv("EMBED_MODEL", "vit_small_patch14_dinov2")
+        model_name = os.getenv("MODEL_NAME", "vit_small_patch14_dinov2")
         model = timm.create_model(model_name, pretrained=True)
         model.eval(); model.reset_classifier(0)
         cfg = timm.data.resolve_data_config({}, model=model)

@@ -1,6 +1,11 @@
 project_id,title,country,climate_bin,typology,massing_type,wwr_band,image_ids,plan_ids,tags
-p_0001,P 0001,unknown,unknown,unknown,unknown,unknown,"['i_p_0001_hero2', 'i_p_0001_hero3', 'i_p_0001_hero4']",[],[]
-p_demo01,P Demo01,unknown,unknown,unknown,unknown,unknown,"['i_p_demo01_facade', 'i_p_demo01_hero', 'i_p_demo01_plan']",[],[]
-p_demo02,P Demo02,unknown,unknown,unknown,unknown,unknown,"['i_p_demo02_facade', 'i_p_demo02_hero', 'i_p_demo02_plan']",[],[]
-p_test01,P Test01,unknown,unknown,unknown,unknown,unknown,"['i_p_test01_facade', 'i_p_test01_hero', 'i_p_test01_plan']",[],[]
-p_test02,P Test02,unknown,unknown,unknown,unknown,unknown,"['i_p_test02_facade', 'i_p_test02_hero', 'i_p_test02_plan']",[],[]
+p_big_8house,8 House,Denmark,unknown,midrise_housing,perimeter_block,unknown,"['i_hero','i_facade','i_plan']","['pl_plan']","['courtyard','mixed_use']"
+p_mvrdv_markthal,Markthal,Netherlands,unknown,mixed_use,courtyard,unknown,"['i_hero','i_facade','i_plan']","['pl_plan']","['market','residential']"
+p_sanaa_rolex,Rolex Learning Center,Switzerland,unknown,education,slab,unknown,"['i_hero','i_facade','i_plan']","['pl_plan']","['free_plan','undulating_floor']"
+p_oma_casadamusica,Casa da Música,Portugal,unknown,cultural,object,unknown,"['i_hero','i_facade','i_plan']","['pl_plan']","['concert_hall']"
+p_kahn_salk,Salk Institute,USA,unknown,education,bar,unknown,"['i_hero','i_facade','i_plan']","['pl_plan']","['courtyard','laboratory']"
+p_mies_barcelona,Barcelona Pavilion,Spain,unknown,cultural,pavilion,unknown,"['i_hero','i_facade','i_plan']","['pl_plan']","['exhibition','modernism']"
+p_ando_churchlight,Church of the Light,Japan,unknown,religious,object,unknown,"['i_hero','i_facade','i_plan']","['pl_plan']","['concrete','cross_light']"
+p_kere_gando,Gando Primary School,Burkina Faso,unknown,education,courtyard,unknown,"['i_hero','i_facade','i_plan']","['pl_plan']","['brick','natural_ventilation']"
+p_lacatonfrac,FRAC Nord-Pas de Calais,France,unknown,cultural,hall,unknown,"['i_hero','i_facade','i_plan']","['pl_plan']","['adaptive_reuse','glass_facade']"
+p_corbu_unite,Unité d’Habitation,France,unknown,midrise_housing,slab,unknown,"['i_hero','i_facade','i_plan']","['pl_plan']","['pilotis','brise_soleil']"

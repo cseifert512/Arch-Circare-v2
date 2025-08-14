@@ -1,7 +1,10 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List
 import os, time
+import threading
 import numpy as np
 import torch, timm
 from PIL import Image
@@ -10,6 +13,18 @@ from app.faiss_service import FaissStore, l2n
 
 DATA_DIR = os.getenv("DATA_DIR", "data")
 app = FastAPI(title="Design Precedent Navigator API", version="0.2.0")
+
+# Enable CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Serve static assets
+app.mount("/images", StaticFiles(directory=os.path.join(DATA_DIR, "images")), name="images")
+app.mount("/plans", StaticFiles(directory=os.path.join(DATA_DIR, "plans")), name="plans")
 
 # ---- Lazy singletons ----
 _store: FaissStore | None = None
@@ -40,6 +55,18 @@ def embed_pil(pil: Image.Image) -> np.ndarray:
         feat = model(x)
         vec = feat.cpu().numpy().astype("float32")
     return l2n(vec)[0]
+
+# Non-blocking warm-up on startup so health is instant
+@app.on_event("startup")
+async def _startup_warm():
+    def _warm():
+        try:
+            get_store()
+            get_model_and_transform()
+        except Exception:
+            # Avoid crashing startup on warm errors
+            pass
+    threading.Thread(target=_warm, daemon=True).start()
 
 class SearchById(BaseModel):
     image_id: str

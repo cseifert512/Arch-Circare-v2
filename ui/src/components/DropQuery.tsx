@@ -1,7 +1,30 @@
 import { useCallback, useRef, useState } from "react";
 import { searchFile } from "../lib/api";
 
-export default function DropQuery() {
+interface SearchResult {
+  rank: number;
+  distance: number;
+  faiss_id: number;
+  image_id: string;
+  project_id: string;
+  thumb_url?: string;
+  title?: string;
+  country?: string;
+  typology?: string;
+}
+
+interface SearchResponse {
+  latency_ms: number;
+  results: SearchResult[];
+}
+
+interface DropQueryProps {
+  onSearchStart?: () => void;
+  onSearchComplete?: () => void;
+  onSearchResults?: (response: SearchResponse) => void;
+}
+
+export default function DropQuery({ onSearchStart, onSearchComplete, onSearchResults }: DropQueryProps) {
 	const [isDragging, setIsDragging] = useState(false);
 	const [status, setStatus] = useState<string>("");
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -11,14 +34,18 @@ export default function DropQuery() {
 		const file = files[0];
 		try {
 			setStatus("Uploading...");
+			onSearchStart?.();
 			const json = await searchFile(file, 12);
 			console.log("Search results:", json);
 			setStatus(`Done. ${json?.results?.length ?? 0} results`);
+			onSearchResults?.(json);
 		} catch (err: any) {
 			console.error(err);
 			setStatus(err?.message || "Error");
+		} finally {
+			onSearchComplete?.();
 		}
-	}, []);
+	}, [onSearchStart, onSearchComplete, onSearchResults]);
 
 	return (
 		<div style={{ display: "grid", gap: 12 }}>
@@ -63,5 +90,6 @@ export default function DropQuery() {
 		</div>
 	);
 }
+
 
 

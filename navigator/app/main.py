@@ -10,6 +10,7 @@ import torch, timm
 from PIL import Image
 
 from app.faiss_service import FaissStore, l2n
+from app.patches import compute_query_patches, rerank_by_patches
 
 DATA_DIR = os.getenv("DATA_DIR", "data")
 app = FastAPI(title="Design Precedent Navigator API", version="0.2.0")
@@ -225,23 +226,55 @@ async def search_file(
     w_visual: float = 1.0,
     w_attr: float = 0.25,
     strict: bool = False,
+    rerank: bool = False,
+    re_topk: int = 50,
+    patches: int = 16,
 ):
     st = get_store()
     try:
         pil = Image.open(file.file)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid image file.")
+    
+    # Determine search k based on reranking
+    search_k = max(top_k, re_topk) if rerank else top_k
+    
     q = embed_pil(pil)
     t0 = time.time()
-    D, I = st.search(q, top_k)
+    D, I = st.search(q, search_k)
     ms = int((time.time() - t0) * 1000)
     hydrated = st.results_payload(D, I)
     f = Filters(typology=typology, climate_bin=climate_bin, massing_type=massing_type)
     w = Weights(visual=w_visual, attr=w_attr)
     fused = fuse_and_sort(hydrated, D, w, f, strict=strict)
+    
+    # Apply patch reranking if requested
+    debug_info = {}
+    if rerank:
+        rerank_t0 = time.time()
+        
+        # Compute query patches
+        query_patches = compute_query_patches(pil, grid=4)
+        
+        # Rerank results
+        reranked_results, rerank_debug = rerank_by_patches(
+            fused, query_patches, re_topk, top_k, patches, DATA_DIR
+        )
+        
+        rerank_ms = int((time.time() - rerank_t0) * 1000)
+        debug_info = {
+            **rerank_debug,
+            "rerank_latency_ms": rerank_ms
+        }
+        
+        final_results = reranked_results
+    else:
+        final_results = fused[:top_k]
+    
     return {
         "latency_ms": ms,
         "weights": w.model_dump(),
         "filters": f.model_dump(),
-        "results": fused
+        "results": final_results,
+        "debug": debug_info
     }

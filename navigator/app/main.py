@@ -100,6 +100,25 @@ def search_id(body: SearchById):
     ms = int((time.time() - t0) * 1000)
     return {"latency_ms": ms, "results": st.results_payload(D, I)}
 
+@app.get("/projects/{project_id}/images")
+def list_project_images(project_id: str):
+    images_dir = os.path.join(DATA_DIR, "images", project_id)
+    if not os.path.isdir(images_dir):
+        raise HTTPException(status_code=404, detail=f"Project images not found: {project_id}")
+    exts = {".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG"}
+    files = [f for f in os.listdir(images_dir) if os.path.splitext(f)[1] in exts]
+    files.sort()
+    out = []
+    for fname in files:
+        stem, _ = os.path.splitext(fname)
+        image_id = f"i_{project_id}_{stem}"
+        out.append({
+            "image_id": image_id,
+            "filename": fname,
+            "url": f"/images/{project_id}/{fname}"
+        })
+    return {"project_id": project_id, "images": out}
+
 @app.post("/search/vector")
 def search_vector(body: SearchByVector):
     st = get_store()

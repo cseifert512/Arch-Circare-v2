@@ -1,3 +1,4 @@
+import { API_BASE } from '../lib/api';
 interface SearchResult {
   rank: number;
   distance: number;
@@ -14,9 +15,10 @@ interface ResultsGridProps {
   results: SearchResult[];
   isLoading: boolean;
   latency?: number;
+  onOpenGallery?: (projectId: string, initialImageId?: string) => void;
 }
 
-export default function ResultsGrid({ results, isLoading, latency }: ResultsGridProps) {
+export default function ResultsGrid({ results, isLoading, latency, onOpenGallery }: ResultsGridProps) {
   if (isLoading) {
     return (
       <div style={{ marginTop: 24 }}>
@@ -110,7 +112,8 @@ export default function ResultsGrid({ results, isLoading, latency }: ResultsGrid
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.boxShadow = 'none';
-          }}>
+          }}
+          onClick={() => onOpenGallery?.(result.project_id, result.image_id)}>
             <div style={{
               width: '100%',
               height: 160,
@@ -124,7 +127,7 @@ export default function ResultsGrid({ results, isLoading, latency }: ResultsGrid
             }}>
               {result.thumb_url ? (
                 <img 
-                  src={result.thumb_url} 
+                  src={result.thumb_url.startsWith('http') ? result.thumb_url : `${API_BASE}${result.thumb_url}`}
                   alt={result.title}
                   style={{
                     width: '100%',

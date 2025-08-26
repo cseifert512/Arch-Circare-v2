@@ -37,14 +37,20 @@ def main(data_dir: str, model_name: str):
     os.makedirs(emb_dir, exist_ok=True)
     os.makedirs(os.path.join(data_dir, "embeddings"), exist_ok=True)
 
-    projects = [p for p in glob.glob(os.path.join(img_root, "*")) if os.path.isdir(p)]
+    # Collect all image paths deterministically
+    projects = sorted([p for p in glob.glob(os.path.join(img_root, "*")) if os.path.isdir(p)])
     image_paths = []
     for pdir in projects:
-        image_paths += glob.glob(os.path.join(pdir, "*.jpg")) + glob.glob(os.path.join(pdir, "*.jpeg")) + glob.glob(os.path.join(pdir, "*.png"))
+        image_paths += glob.glob(os.path.join(pdir, "*.jpg"))
+        image_paths += glob.glob(os.path.join(pdir, "*.jpeg"))
+        image_paths += glob.glob(os.path.join(pdir, "*.png"))
+    # Sort images to achieve reproducible ordering across platforms
+    image_paths = sorted(image_paths)
 
     print(f"[embed] Using data_dir: {data_dir}")
     print(f"[embed] Found {len(image_paths)} images in {len(projects)} project folders.", flush=True)
-    id_map = {}
+    # Track metadata by image_id while embedding
+    image_meta = {}
 
     if len(image_paths) == 0:
         # Still write empty id_map so downstream steps don't crash
@@ -57,7 +63,7 @@ def main(data_dir: str, model_name: str):
 
     model, tfm = load_model(model_name)
 
-    for idx, img_path in enumerate(tqdm(image_paths, desc="[embed] Embedding", unit="img")):
+    for img_path in tqdm(image_paths, desc="[embed] Embedding", unit="img"):
         project_id = pathlib.Path(img_path).parent.name
         base = pathlib.Path(img_path).stem
         image_id = f"i_{project_id}_{base}"
@@ -74,10 +80,25 @@ def main(data_dir: str, model_name: str):
             vec = l2n(vec)[0]
 
         np.save(os.path.join(emb_dir, f"{image_id}.npy"), vec)
-        id_map[str(idx)] = {
-            "image_id": image_id,
+        image_meta[image_id] = {
             "project_id": project_id,
             "thumb": f"/images/{project_id}/{os.path.basename(img_path)}"
+        }
+
+    # Build id_map in the SAME ORDER that build_faiss.py will load vectors
+    # i.e., sorted by embedding file path under emb_dir
+    vec_paths = sorted(glob.glob(os.path.join(emb_dir, "*.npy")))
+    id_map = {}
+    for idx, vec_path in enumerate(vec_paths):
+        image_id = pathlib.Path(vec_path).stem
+        meta = image_meta.get(image_id)
+        if meta is None:
+            # Skip stray embeddings without known metadata
+            continue
+        id_map[str(idx)] = {
+            "image_id": image_id,
+            "project_id": meta["project_id"],
+            "thumb": meta["thumb"],
         }
 
     idmap_path = os.path.join(data_dir, "embeddings", "id_map.json")

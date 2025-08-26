@@ -15,10 +15,17 @@ interface ResultsGridProps {
   results: SearchResult[];
   isLoading: boolean;
   latency?: number;
+  debug?: {
+    rerank?: string;
+    re_topk?: number;
+    patches?: number;
+    moved?: number;
+    rerank_latency_ms?: number;
+  };
   onOpenGallery?: (projectId: string, initialImageId?: string) => void;
 }
 
-export default function ResultsGrid({ results, isLoading, latency, onOpenGallery }: ResultsGridProps) {
+export default function ResultsGrid({ results, isLoading, latency, debug, onOpenGallery }: ResultsGridProps) {
   if (isLoading) {
     return (
       <div style={{ marginTop: 24 }}>
@@ -83,16 +90,37 @@ export default function ResultsGrid({ results, isLoading, latency, onOpenGallery
 
   return (
     <div style={{ marginTop: 24 }}>
-      {latency && (
-        <div style={{ 
-          marginBottom: 16, 
-          fontSize: 14, 
-          color: '#6b7280',
-          textAlign: 'right'
-        }}>
-          {latency} ms
+      <div style={{ 
+        marginBottom: 16, 
+        fontSize: 14, 
+        color: '#6b7280',
+        textAlign: 'right',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <div>
+          {debug?.rerank && (
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '2px 8px',
+              backgroundColor: '#dbeafe',
+              color: '#1e40af',
+              borderRadius: 12,
+              fontSize: 12,
+              fontWeight: 500,
+              marginRight: 8
+            }}>
+              {debug.rerank} (moved: {debug.moved})
+            </span>
+          )}
         </div>
-      )}
+        <div>
+          {latency && `${latency} ms`}
+          {debug?.rerank_latency_ms && ` (rerank: ${debug.rerank_latency_ms} ms)`}
+        </div>
+      </div>
       <div style={{ 
         display: 'grid', 
         gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 

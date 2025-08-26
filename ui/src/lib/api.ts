@@ -27,7 +27,9 @@ export async function searchFileWithFilters(file: File, opts: {
   topK?: number,
   filters?: FilterOptions,
   weights?: Weights,
-  strict?: boolean
+  strict?: boolean,
+  rerank?: boolean,
+  reTopK?: number
 } = {}) {
   const fd = new FormData();
   fd.append('file', file);
@@ -43,6 +45,13 @@ export async function searchFileWithFilters(file: File, opts: {
   if (opts.weights?.attr !== undefined) params.append('w_attr', opts.weights.attr.toString());
   
   if (opts.strict) params.append('strict', 'true');
+  
+  // Add patch rerank parameters
+  if (opts.rerank) {
+    params.append('rerank', 'true');
+    params.append('re_topk', (opts.reTopK ?? 48).toString());
+    params.append('patches', '16');
+  }
   
   const url = `${BASE}/search/file?${params.toString()}`;
   const res = await fetch(url, { method: 'POST', body: fd });

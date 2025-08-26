@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { searchFileWithFilters, type FilterOptions, type Weights } from "../lib/api";
+import { type PatchRerankOptions } from "./PatchRerankControls";
 
 interface SearchResult {
   rank: number;
@@ -25,9 +26,10 @@ interface DropQueryProps {
   onImageUpload?: (imageUrl: string) => void;
   filters?: FilterOptions;
   weights?: Weights;
+  rerank?: PatchRerankOptions;
 }
 
-export default function DropQuery({ onSearchStart, onSearchComplete, onSearchResults, onImageUpload, filters, weights }: DropQueryProps) {
+export default function DropQuery({ onSearchStart, onSearchComplete, onSearchResults, onImageUpload, filters, weights, rerank }: DropQueryProps) {
 	const [isDragging, setIsDragging] = useState(false);
 	const [status, setStatus] = useState<string>("");
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -47,7 +49,9 @@ export default function DropQuery({ onSearchStart, onSearchComplete, onSearchRes
 				topK: 12,
 				filters,
 				weights,
-				strict: false
+				strict: false,
+				rerank: rerank?.enabled,
+				reTopK: rerank?.reTopK
 			});
 			console.log("Search results:", json);
 			setStatus(`Done. ${json?.results?.length ?? 0} results`);
@@ -58,7 +62,7 @@ export default function DropQuery({ onSearchStart, onSearchComplete, onSearchRes
 		} finally {
 			onSearchComplete?.();
 		}
-	}, [onSearchStart, onSearchComplete, onSearchResults, onImageUpload, filters, weights]);
+	}, [onSearchStart, onSearchComplete, onSearchResults, onImageUpload, filters, weights, rerank]);
 
 	return (
 		<div style={{ display: "grid", gap: 12 }}>

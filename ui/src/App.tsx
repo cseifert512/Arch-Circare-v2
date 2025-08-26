@@ -4,6 +4,7 @@ import ResultsGrid from './components/ResultsGrid';
 import Lightbox from './components/Lightbox';
 import FilterControls, { type FilterOptions, type Weights } from './components/FilterControls';
 import FilterChips from './components/FilterChips';
+import PatchRerankControls, { type PatchRerankOptions } from './components/PatchRerankControls';
 import { getProjectImages, API_BASE } from './lib/api';
 
 interface SearchResult {
@@ -21,22 +22,40 @@ interface SearchResult {
 interface SearchResponse {
   latency_ms: number;
   results: SearchResult[];
+  debug?: {
+    rerank?: string;
+    re_topk?: number;
+    patches?: number;
+    moved?: number;
+    rerank_latency_ms?: number;
+  };
 }
 
 export default function App() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [latency, setLatency] = useState<number | undefined>(undefined);
+  const [debugInfo, setDebugInfo] = useState<SearchResponse['debug']>(undefined);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<FilterOptions>({});
   const [currentWeights, setCurrentWeights] = useState<Weights>({ visual: 1.0, attr: 0.25 });
+  const [currentRerank, setCurrentRerank] = useState<PatchRerankOptions>({ enabled: false, reTopK: 48 });
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
   const handleSearchResults = (response: SearchResponse) => {
     setResults(response.results || []);
     setLatency(response.latency_ms);
+    setDebugInfo(response.debug);
+    
+    // Log debug info if available
+    if (response.debug) {
+      console.log('Search debug info:', response.debug);
+      if (response.debug.moved !== undefined) {
+        console.log(`Rerank moved ${response.debug.moved} items`);
+      }
+    }
   };
 
   const handleSearchStart = () => {
@@ -83,6 +102,10 @@ export default function App() {
     setCurrentWeights(weights);
   };
 
+  const handleRerankChange = (rerankOptions: PatchRerankOptions) => {
+    setCurrentRerank(rerankOptions);
+  };
+
   const handleRemoveFilter = (key: keyof FilterOptions) => {
     const newFilters = { ...currentFilters };
     delete newFilters[key];
@@ -119,6 +142,11 @@ export default function App() {
         onRemoveFilter={handleRemoveFilter}
       />
       
+      <PatchRerankControls
+        onRerankChange={handleRerankChange}
+        disabled={isLoading}
+      />
+      
       <DropQuery 
         onSearchStart={handleSearchStart}
         onSearchComplete={handleSearchComplete}
@@ -126,6 +154,7 @@ export default function App() {
         onImageUpload={handleImageUpload}
         filters={currentFilters}
         weights={currentWeights}
+        rerank={currentRerank}
       />
       
       {uploadedImageUrl && (
@@ -162,6 +191,7 @@ export default function App() {
         results={results}
         isLoading={isLoading}
         latency={latency}
+        debug={debugInfo}
         onOpenGallery={openGallery}
       />
 

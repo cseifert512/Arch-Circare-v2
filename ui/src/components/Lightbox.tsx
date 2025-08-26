@@ -5,10 +5,9 @@ export interface LightboxProps {
   onClose: () => void;
   onNext: () => void;
   onPrev: () => void;
-  onSelectIndex?: (i: number) => void;
 }
 
-export default function Lightbox({ open, imageUrls, index, onClose, onNext, onPrev, onSelectIndex }: LightboxProps) {
+export default function Lightbox({ open, imageUrls, index, onClose, onNext, onPrev }: LightboxProps) {
   if (!open) return null;
 
   const hasImages = imageUrls && imageUrls.length > 0;
@@ -133,53 +132,6 @@ export default function Lightbox({ open, imageUrls, index, onClose, onNext, onPr
             <div style={{ color: 'white' }}>No images</div>
           )}
         </div>
-
-        {/* Thumbnails grid */}
-        {hasImages && (
-          <div
-            style={{
-              marginTop: 12,
-              maxWidth: '100%',
-              maxHeight: '20vh',
-              overflowY: 'auto',
-            }}
-          >
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))',
-                gap: 8,
-              }}
-            >
-              {imageUrls.map((thumbUrl, i) => (
-                <button
-                  key={i}
-                  onClick={() => onSelectIndex?.(i)}
-                  aria-label={`Open image ${i + 1}`}
-                  style={{
-                    padding: 0,
-                    border: i === index ? '2px solid #60a5fa' : '1px solid rgba(255,255,255,0.2)',
-                    borderRadius: 4,
-                    background: 'transparent',
-                    cursor: 'pointer',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <img
-                    src={thumbUrl}
-                    alt={`Thumbnail ${i + 1}`}
-                    style={{
-                      width: '100%',
-                      height: 80,
-                      objectFit: 'cover',
-                      display: 'block',
-                    }}
-                  />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

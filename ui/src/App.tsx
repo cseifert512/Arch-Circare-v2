@@ -64,7 +64,6 @@ export default function App() {
   const closeGallery = () => setLightboxOpen(false);
   const nextImage = () => setCurrentIndex(i => (i + 1) % Math.max(galleryUrls.length, 1));
   const prevImage = () => setCurrentIndex(i => (i - 1 + Math.max(galleryUrls.length, 1)) % Math.max(galleryUrls.length, 1));
-  const selectIndex = (i: number) => setCurrentIndex(i);
 
   return (
     <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
@@ -97,7 +96,6 @@ export default function App() {
         onClose={closeGallery}
         onNext={nextImage}
         onPrev={prevImage}
-        onSelectIndex={selectIndex}
       />
     </div>
   );

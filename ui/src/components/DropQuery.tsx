@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { searchFile } from "../lib/api";
+import { searchFileWithFilters, type FilterOptions, type Weights } from "../lib/api";
 
 interface SearchResult {
   rank: number;
@@ -22,9 +22,12 @@ interface DropQueryProps {
   onSearchStart?: () => void;
   onSearchComplete?: () => void;
   onSearchResults?: (response: SearchResponse) => void;
+  onImageUpload?: (imageUrl: string) => void;
+  filters?: FilterOptions;
+  weights?: Weights;
 }
 
-export default function DropQuery({ onSearchStart, onSearchComplete, onSearchResults }: DropQueryProps) {
+export default function DropQuery({ onSearchStart, onSearchComplete, onSearchResults, onImageUpload, filters, weights }: DropQueryProps) {
 	const [isDragging, setIsDragging] = useState(false);
 	const [status, setStatus] = useState<string>("");
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -35,7 +38,17 @@ export default function DropQuery({ onSearchStart, onSearchComplete, onSearchRes
 		try {
 			setStatus("Uploading...");
 			onSearchStart?.();
-			const json = await searchFile(file, 12);
+			
+			// Create object URL for the uploaded image
+			const imageUrl = URL.createObjectURL(file);
+			onImageUpload?.(imageUrl);
+			
+			const json = await searchFileWithFilters(file, {
+				topK: 12,
+				filters,
+				weights,
+				strict: false
+			});
 			console.log("Search results:", json);
 			setStatus(`Done. ${json?.results?.length ?? 0} results`);
 			onSearchResults?.(json);
@@ -45,7 +58,7 @@ export default function DropQuery({ onSearchStart, onSearchComplete, onSearchRes
 		} finally {
 			onSearchComplete?.();
 		}
-	}, [onSearchStart, onSearchComplete, onSearchResults]);
+	}, [onSearchStart, onSearchComplete, onSearchResults, onImageUpload, filters, weights]);
 
 	return (
 		<div style={{ display: "grid", gap: 12 }}>

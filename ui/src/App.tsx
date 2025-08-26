@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DropQuery from './components/DropQuery';
 import ResultsGrid from './components/ResultsGrid';
 import Lightbox from './components/Lightbox';
+import FilterControls, { type FilterOptions, type Weights } from './components/FilterControls';
+import FilterChips from './components/FilterChips';
 import { getProjectImages, API_BASE } from './lib/api';
 
 interface SearchResult {
@@ -28,6 +30,9 @@ export default function App() {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentFilters, setCurrentFilters] = useState<FilterOptions>({});
+  const [currentWeights, setCurrentWeights] = useState<Weights>({ visual: 1.0, attr: 0.25 });
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
   const handleSearchResults = (response: SearchResponse) => {
     setResults(response.results || []);
@@ -38,6 +43,14 @@ export default function App() {
     setIsLoading(true);
     setResults([]);
     setLatency(undefined);
+  };
+
+  const handleImageUpload = (imageUrl: string) => {
+    // Clean up previous object URL if it exists
+    if (uploadedImageUrl) {
+      URL.revokeObjectURL(uploadedImageUrl);
+    }
+    setUploadedImageUrl(imageUrl);
   };
 
   const handleSearchComplete = () => {
@@ -65,6 +78,26 @@ export default function App() {
   const nextImage = () => setCurrentIndex(i => (i + 1) % Math.max(galleryUrls.length, 1));
   const prevImage = () => setCurrentIndex(i => (i - 1 + Math.max(galleryUrls.length, 1)) % Math.max(galleryUrls.length, 1));
 
+  const handleFiltersChange = (filters: FilterOptions, weights: Weights) => {
+    setCurrentFilters(filters);
+    setCurrentWeights(weights);
+  };
+
+  const handleRemoveFilter = (key: keyof FilterOptions) => {
+    const newFilters = { ...currentFilters };
+    delete newFilters[key];
+    setCurrentFilters(newFilters);
+  };
+
+  // Cleanup object URL on unmount
+  useEffect(() => {
+    return () => {
+      if (uploadedImageUrl) {
+        URL.revokeObjectURL(uploadedImageUrl);
+      }
+    };
+  }, [uploadedImageUrl]);
+
   return (
     <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
       <h1 style={{ 
@@ -76,11 +109,54 @@ export default function App() {
         Arch-Circare UI
       </h1>
       
+      <FilterControls 
+        onFiltersChange={handleFiltersChange}
+        disabled={isLoading}
+      />
+      
+      <FilterChips 
+        filters={currentFilters}
+        onRemoveFilter={handleRemoveFilter}
+      />
+      
       <DropQuery 
         onSearchStart={handleSearchStart}
         onSearchComplete={handleSearchComplete}
         onSearchResults={handleSearchResults}
+        onImageUpload={handleImageUpload}
+        filters={currentFilters}
+        weights={currentWeights}
       />
+      
+      {uploadedImageUrl && (
+        <div style={{ marginBottom: 24 }}>
+          <h3 style={{ 
+            marginBottom: 12, 
+            fontSize: 18, 
+            fontWeight: 600,
+            color: '#374151'
+          }}>
+            Uploaded Image
+          </h3>
+          <div style={{
+            display: 'inline-block',
+            border: '2px solid #e5e7eb',
+            borderRadius: 8,
+            overflow: 'hidden',
+            maxWidth: '300px'
+          }}>
+            <img 
+              src={uploadedImageUrl} 
+              alt="Uploaded image"
+              style={{
+                width: '100%',
+                height: 'auto',
+                display: 'block'
+              }}
+            />
+          </div>
+        </div>
+      )}
       
       <ResultsGrid 
         results={results}

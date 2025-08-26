@@ -26,7 +26,10 @@ const TYPOLOGY_OPTIONS = [
 ];
 
 const CLIMATE_OPTIONS = [
-  'unknown' // Based on the data, most are unknown
+  'temperate_oceanic',
+  'mediterranean',
+  'humid_subtropical',
+  'hot_semiarid'
 ];
 
 const MASSING_OPTIONS = [

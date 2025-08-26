@@ -165,6 +165,26 @@ def search_id(body: SearchById):
         "results": fused
     }
 
+@app.get("/projects")
+def list_projects():
+    """Get all projects with their metadata"""
+    store = get_store()
+    if store._projects is None or store._projects.empty:
+        return []
+    
+    projects = []
+    for _, row in store._projects.iterrows():
+        projects.append({
+            "project_id": row.get("project_id"),
+            "title": row.get("title"),
+            "country": row.get("country"),
+            "typology": row.get("typology"),
+            "climate_bin": row.get("climate_bin"),
+            "massing_type": row.get("massing_type"),
+            "wwr_band": row.get("wwr_band")
+        })
+    return projects
+
 @app.get("/projects/{project_id}/images")
 def list_project_images(project_id: str):
     images_dir = os.path.join(DATA_DIR, "images", project_id)

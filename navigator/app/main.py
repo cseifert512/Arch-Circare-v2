@@ -140,43 +140,42 @@ async def _startup_warm():
             pass
     threading.Thread(target=_warm, daemon=True).start()
 
-class SearchById(BaseModel):
-    image_id: str
-    top_k: int = 12
-    # Sprint A options
-    class Filters(BaseModel):
-        typology: Optional[str] = None
-        climate_bin: Optional[str] = None
-        massing_type: Optional[str] = None
-
-    class Weights(BaseModel):
-        visual: float = 1.0
-        attr: float = 0.25
-        spatial: float = 0.6
-
-    filters: Filters = Filters()
-    weights: Weights = Weights()
-    strict: bool = False
-
-class SearchByVector(BaseModel):
-    vector: List[float]
-    top_k: int = 12
+# Sprint A: Updated request models
+class Weights(BaseModel):
+    visual: float = 1.0
+    spatial: float = 0.0
+    attr: float = 0.25
 
 class Filters(BaseModel):
     typology: Optional[str] = None
     climate_bin: Optional[str] = None
     massing_type: Optional[str] = None
 
-class Weights(BaseModel):
-    visual: float = 1.0
-    attr: float = 0.25
-    spatial: float = 0.6
-
 class SearchOpts(BaseModel):
     top_k: int = 12
-    filters: Filters = Filters()
     weights: Weights = Weights()
+    filters: Filters = Filters()
     strict: bool = False
+    mode: Optional[str] = None
+
+class SearchById(BaseModel):
+    image_id: str
+    top_k: int = 12
+    weights: Weights = Weights()
+    filters: Filters = Filters()
+    strict: bool = False
+    mode: Optional[str] = None
+
+class SearchByVector(BaseModel):
+    vector: List[float]
+    top_k: int = 12
+
+def renorm_weights(wv: float, ws: float, wa: float, has_spatial: bool) -> np.ndarray:
+    """Normalize weights, zeroing missing signals and re-normalizing to sum to 1."""
+    w = np.array([wv, ws if has_spatial else 0.0, wa], dtype="float32")
+    w = np.maximum(w, 0)  # Ensure non-negative
+    s = w.sum()
+    return (w / s) if s > 0 else np.array([1, 0, 0], dtype="float32")
 
 def attr_distance(row: dict, f: Filters) -> float:
     checks: List[bool] = []
@@ -193,13 +192,27 @@ def attr_distance(row: dict, f: Filters) -> float:
 
 def fuse_and_sort(results: List[dict], D: np.ndarray, weights: Weights, filters: Filters, 
                  strict: bool = False, query_spatial_features: Optional[List[float]] = None, 
-                 store: Optional[FaissStore] = None) -> List[dict]:
+                 store: Optional[FaissStore] = None) -> tuple[List[dict], dict]:
+    """
+    Fuse scores using effective weights and return results with debug info.
+    Returns: (sorted_results, debug_info)
+    """
+    # Normalize visual distances (FAISS distances)
     dv = np.array(D, dtype="float32")
     if dv.size > 1:
         dv = (dv - dv.min()) / (dv.max() - dv.min() + 1e-12)
     else:
         dv = np.zeros_like(dv)
 
+    # Determine if spatial features are available
+    has_spatial = query_spatial_features is not None and store is not None
+    
+    # Compute effective weights
+    w_eff = renorm_weights(weights.visual, weights.spatial, weights.attr, has_spatial)
+    
+    # Store baseline visual-only ranking for comparison
+    baseline_ranking = [r["image_id"] for r in results[:len(dv)]]
+    
     fused = []
     for j, r in enumerate(results):
         da = attr_distance(r, filters)
@@ -208,15 +221,41 @@ def fuse_and_sort(results: List[dict], D: np.ndarray, weights: Weights, filters:
         
         # Compute spatial distance if available
         ds = 0.0
-        if query_spatial_features is not None and store is not None and r.get("project_id"):
+        if has_spatial and r.get("project_id"):
             candidate_features = store.get_spatial_features(r["project_id"])
             if candidate_features is not None:
                 ds = np.linalg.norm(np.array(query_spatial_features) - np.array(candidate_features))
         
-        score = weights.visual * float(dv[j]) + weights.attr * float(da) + weights.spatial * float(ds)
+        # Fuse score (lower is better)
+        score = w_eff[0] * float(dv[j]) + w_eff[1] * float(ds) + w_eff[2] * float(da)
         fused.append((score, r))
+    
     fused.sort(key=lambda x: x[0])
-    return [r for _, r in fused]
+    sorted_results = [r for _, r in fused]
+    
+    # Compute debug information
+    debug = {
+        "weights_requested": {
+            "visual": weights.visual,
+            "spatial": weights.spatial,
+            "attr": weights.attr
+        },
+        "weights_effective": {
+            "visual": float(w_eff[0]),
+            "spatial": float(w_eff[1]),
+            "attr": float(w_eff[2])
+        },
+        "rerank": "none",
+        "moved": 0
+    }
+    
+    # Calculate how many ranks changed vs baseline
+    if len(sorted_results) >= len(baseline_ranking):
+        new_ranking = [r["image_id"] for r in sorted_results[:len(baseline_ranking)]]
+        moved = sum(1 for i, (old, new) in enumerate(zip(baseline_ranking, new_ranking)) if old != new)
+        debug["moved"] = moved
+    
+    return sorted_results, debug
 
 @app.get("/health")
 def health():
@@ -237,16 +276,30 @@ def search_id(body: SearchById):
         q = st.vector_for_image(body.image_id)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    
     t0 = time.time()
     D, I = st.search(q, body.top_k)
     ms = int((time.time() - t0) * 1000)
     hydrated = st.results_payload(D, I)
-    fused = fuse_and_sort(hydrated, D, body.weights, body.filters, strict=body.strict, store=st)
+    
+    # Compute spatial features if in plan mode
+    query_spatial_features = None
+    if body.mode == "plan" or body.mode == "true":
+        # For ID search, we need to get the image and compute features
+        # This is a simplified approach - in practice you might want to store pre-computed features
+        pass
+    
+    fused_results, debug = fuse_and_sort(hydrated, D, body.weights, body.filters, 
+                                        strict=body.strict, 
+                                        query_spatial_features=query_spatial_features, 
+                                        store=st)
+    
     return {
         "latency_ms": ms,
         "weights": body.weights.model_dump(),
         "filters": body.filters.model_dump(),
-        "results": fused
+        "results": fused_results,
+        "debug": debug
     }
 
 @app.get("/projects")
@@ -365,11 +418,12 @@ async def search_file(
                             }
                         })
     
-    fused = fuse_and_sort(hydrated, D, w, f, strict=strict, 
-                         query_spatial_features=query_spatial_features, store=st)
+    # Use new fusion function
+    fused_results, fusion_debug = fuse_and_sort(hydrated, D, w, f, strict=strict, 
+                                               query_spatial_features=query_spatial_features, store=st)
     
     # Apply patch reranking if requested
-    debug_info = {}
+    debug_info = fusion_debug.copy()
     if rerank:
         rerank_t0 = time.time()
         
@@ -378,28 +432,28 @@ async def search_file(
         
         # Rerank results
         reranked_results, rerank_debug = rerank_by_patches(
-            fused, query_patches, re_topk, top_k, patches, DATA_DIR
+            fused_results, query_patches, re_topk, top_k, patches, DATA_DIR
         )
         
         rerank_ms = int((time.time() - rerank_t0) * 1000)
-        debug_info = {
+        debug_info.update({
             **rerank_debug,
-            "rerank_latency_ms": rerank_ms
-        }
+            "rerank_latency_ms": rerank_ms,
+            "rerank": "patch_min"
+        })
         
         final_results = reranked_results
     else:
-        final_results = fused[:top_k]
+        final_results = fused_results[:top_k]
     
     # Combine debug info
-    combined_debug = debug_info.copy() if debug_info else {}
     if debug_spatial is not None:
-        combined_debug["spatial"] = debug_spatial
+        debug_info["spatial"] = debug_spatial
     
     return {
         "latency_ms": ms,
         "weights": w.model_dump(),
         "filters": f.model_dump(),
         "results": final_results,
-        "debug": combined_debug
+        "debug": debug_info
     }

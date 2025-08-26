@@ -2,7 +2,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.staticfiles import StaticFiles
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 import os, time
 import threading
 import numpy as np
@@ -71,10 +71,68 @@ async def _startup_warm():
 class SearchById(BaseModel):
     image_id: str
     top_k: int = 12
+    # Sprint A options
+    class Filters(BaseModel):
+        typology: Optional[str] = None
+        climate_bin: Optional[str] = None
+        massing_type: Optional[str] = None
+
+    class Weights(BaseModel):
+        visual: float = 1.0
+        attr: float = 0.25
+
+    filters: Filters = Filters()
+    weights: Weights = Weights()
+    strict: bool = False
 
 class SearchByVector(BaseModel):
     vector: List[float]
     top_k: int = 12
+
+class Filters(BaseModel):
+    typology: Optional[str] = None
+    climate_bin: Optional[str] = None
+    massing_type: Optional[str] = None
+
+class Weights(BaseModel):
+    visual: float = 1.0
+    attr: float = 0.25
+
+class SearchOpts(BaseModel):
+    top_k: int = 12
+    filters: Filters = Filters()
+    weights: Weights = Weights()
+    strict: bool = False
+
+def attr_distance(row: dict, f: Filters) -> float:
+    checks: List[bool] = []
+    if f.typology:
+        checks.append(row.get("typology") == f.typology)
+    if f.climate_bin:
+        checks.append(row.get("climate_bin") == f.climate_bin)
+    if f.massing_type:
+        checks.append(row.get("massing_type") == f.massing_type)
+    if not checks:
+        return 0.0
+    mismatches = sum(1 for ok in checks if not ok)
+    return mismatches / len(checks)
+
+def fuse_and_sort(results: List[dict], D: np.ndarray, weights: Weights, filters: Filters, strict: bool = False) -> List[dict]:
+    dv = np.array(D, dtype="float32")
+    if dv.size > 1:
+        dv = (dv - dv.min()) / (dv.max() - dv.min() + 1e-12)
+    else:
+        dv = np.zeros_like(dv)
+
+    fused = []
+    for j, r in enumerate(results):
+        da = attr_distance(r, filters)
+        if strict and da > 0.0:
+            continue
+        score = weights.visual * float(dv[j]) + weights.attr * float(da)
+        fused.append((score, r))
+    fused.sort(key=lambda x: x[0])
+    return [r for _, r in fused]
 
 @app.get("/health")
 def health():
@@ -98,7 +156,14 @@ def search_id(body: SearchById):
     t0 = time.time()
     D, I = st.search(q, body.top_k)
     ms = int((time.time() - t0) * 1000)
-    return {"latency_ms": ms, "results": st.results_payload(D, I)}
+    hydrated = st.results_payload(D, I)
+    fused = fuse_and_sort(hydrated, D, body.weights, body.filters, strict=body.strict)
+    return {
+        "latency_ms": ms,
+        "weights": body.weights.model_dump(),
+        "filters": body.filters.model_dump(),
+        "results": fused
+    }
 
 @app.get("/projects/{project_id}/images")
 def list_project_images(project_id: str):
@@ -131,7 +196,16 @@ def search_vector(body: SearchByVector):
     return {"latency_ms": ms, "results": st.results_payload(D, I)}
 
 @app.post("/search/file")
-async def search_file(file: UploadFile = File(...), top_k: int = 12):
+async def search_file(
+    file: UploadFile = File(...),
+    top_k: int = 12,
+    typology: Optional[str] = None,
+    climate_bin: Optional[str] = None,
+    massing_type: Optional[str] = None,
+    w_visual: float = 1.0,
+    w_attr: float = 0.25,
+    strict: bool = False,
+):
     st = get_store()
     try:
         pil = Image.open(file.file)
@@ -141,4 +215,13 @@ async def search_file(file: UploadFile = File(...), top_k: int = 12):
     t0 = time.time()
     D, I = st.search(q, top_k)
     ms = int((time.time() - t0) * 1000)
-    return {"latency_ms": ms, "results": st.results_payload(D, I)}
+    hydrated = st.results_payload(D, I)
+    f = Filters(typology=typology, climate_bin=climate_bin, massing_type=massing_type)
+    w = Weights(visual=w_visual, attr=w_attr)
+    fused = fuse_and_sort(hydrated, D, w, f, strict=strict)
+    return {
+        "latency_ms": ms,
+        "weights": w.model_dump(),
+        "filters": f.model_dump(),
+        "results": fused
+    }

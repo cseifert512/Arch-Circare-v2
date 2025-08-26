@@ -66,7 +66,9 @@ class FaissStore:
                     row.update({
                         "title": r.get("title"),
                         "country": r.get("country"),
-                        "typology": r.get("typology")
+                        "typology": r.get("typology"),
+                        "climate_bin": r.get("climate_bin"),
+                        "massing_type": r.get("massing_type"),
                     })
             rows.append(row)
         return rows

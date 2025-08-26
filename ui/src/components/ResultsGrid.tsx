@@ -1,4 +1,5 @@
 import { API_BASE } from '../lib/api';
+
 interface SearchResult {
   rank: number;
   distance: number;
@@ -21,8 +22,91 @@ interface ResultsGridProps {
     patches?: number;
     moved?: number;
     rerank_latency_ms?: number;
+    spatial?: {
+      query_features: {
+        elongation: number;
+        convexity: number;
+        room_count: number;
+        corridor_ratio: number;
+      };
+      top_candidates: Array<{
+        rank: number;
+        project_id: string;
+        features: {
+          elongation: number;
+          convexity: number;
+          room_count: number;
+          corridor_ratio: number;
+        };
+      }>;
+    };
   };
   onOpenGallery?: (projectId: string, initialImageId?: string) => void;
+}
+
+// Component for spatial metrics tooltip
+function SpatialMetricsTooltip({ projectId, spatialDebug }: { 
+  projectId: string; 
+  spatialDebug?: {
+    query_features: {
+      elongation: number;
+      convexity: number;
+      room_count: number;
+      corridor_ratio: number;
+    };
+    top_candidates: Array<{
+      rank: number;
+      project_id: string;
+      features: {
+        elongation: number;
+        convexity: number;
+        room_count: number;
+        corridor_ratio: number;
+      };
+    }>;
+  };
+}) {
+  if (!spatialDebug) return null;
+  
+  const candidate = spatialDebug.top_candidates.find((c: any) => c.project_id === projectId);
+  if (!candidate) {
+    return (
+      <div style={{
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        backgroundColor: '#fef3c7',
+        color: '#92400e',
+        padding: '2px 6px',
+        borderRadius: 4,
+        fontSize: 10,
+        fontWeight: 500,
+        zIndex: 10
+      }}>
+        No plan metrics
+      </div>
+    );
+  }
+  
+  const { features } = candidate;
+  return (
+    <div style={{
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      color: 'white',
+      padding: '4px 8px',
+      borderRadius: 4,
+      fontSize: 11,
+      fontWeight: 500,
+      zIndex: 10,
+      cursor: 'help'
+    }}
+    title={`E:${features.elongation.toFixed(2)} C:${features.convexity.toFixed(2)} R:${features.room_count} Corr:${features.corridor_ratio.toFixed(3)}`}>
+      ℹ︎
+    </div>
+  );
 }
 
 export default function ResultsGrid({ results, isLoading, latency, debug, onOpenGallery }: ResultsGridProps) {
@@ -115,6 +199,21 @@ export default function ResultsGrid({ results, isLoading, latency, debug, onOpen
               {debug.rerank} (moved: {debug.moved})
             </span>
           )}
+          {debug?.spatial && (
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '2px 8px',
+              backgroundColor: '#dcfce7',
+              color: '#166534',
+              borderRadius: 12,
+              fontSize: 12,
+              fontWeight: 500,
+              marginRight: 8
+            }}>
+              Plan mode active
+            </span>
+          )}
         </div>
         <div>
           {latency && `${latency} ms`}
@@ -127,13 +226,14 @@ export default function ResultsGrid({ results, isLoading, latency, debug, onOpen
         gap: 16 
       }}>
         {results.map((result) => (
-                      <div key={result.faiss_id} style={{
+          <div key={result.faiss_id} style={{
             border: '1px solid #e5e7eb',
             borderRadius: 8,
             padding: 16,
             background: 'white',
             transition: 'box-shadow 0.2s',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            position: 'relative'
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
@@ -142,6 +242,10 @@ export default function ResultsGrid({ results, isLoading, latency, debug, onOpen
             e.currentTarget.style.boxShadow = 'none';
           }}
           onClick={() => onOpenGallery?.(result.project_id, result.image_id)}>
+            <SpatialMetricsTooltip 
+              projectId={result.project_id} 
+              spatialDebug={debug?.spatial}
+            />
             <div style={{
               width: '100%',
               height: 160,

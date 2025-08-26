@@ -1,5 +1,5 @@
 import os, json, time, threading
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 import numpy as np
 import faiss
 import pandas as pd
@@ -15,15 +15,100 @@ class FaissStore:
         self.index_path = os.path.join(data_dir, "embeddings", "index.faiss")
         self.idmap_path = os.path.join(data_dir, "embeddings", "id_map.json")
         self.meta_csv  = os.path.join(data_dir, "metadata", "projects.csv")
+        self.spatial_csv = os.path.join(data_dir, "metadata", "spatial.csv")
         self._lock = threading.RLock()
         self._index = None
         self._idmap: Dict[str, Dict[str, str]] = {}
         self._projects = None
+        self._spatial_features: Dict[str, List[float]] = {}
+        self._spatial_normalizers: Dict[str, Tuple[float, float]] = {}
         self.reload()
 
     def _is_ivf(self, index) -> bool:
         # Works across faiss wrapper types
         return any("IndexIVF" in c.__name__ for c in type(index).mro())
+
+    def _load_spatial_features(self):
+        """Load and normalize spatial features from CSV."""
+        self._spatial_features = {}
+        if not os.path.exists(self.spatial_csv):
+            return
+        
+        try:
+            df = pd.read_csv(self.spatial_csv)
+            
+            # Store raw features
+            for _, row in df.iterrows():
+                project_id = row['project_id']
+                self._spatial_features[project_id] = [
+                    float(row['elongation']),
+                    float(row['convexity']),
+                    float(row['room_count']),
+                    float(row['corridor_ratio'])
+                ]
+            
+            # Compute normalization parameters
+            if len(df) > 0:
+                # elongation: log1p then min-max
+                elongations = np.log1p(df['elongation'].values)
+                self._spatial_normalizers['elongation'] = (elongations.min(), elongations.max())
+                
+                # convexity: already in [0,1], no normalization needed
+                self._spatial_normalizers['convexity'] = (0.0, 1.0)
+                
+                # room_count: log1p then min-max
+                room_counts = np.log1p(df['room_count'].values)
+                self._spatial_normalizers['room_count'] = (room_counts.min(), room_counts.max())
+                
+                # corridor_ratio: min-max
+                corridor_ratios = df['corridor_ratio'].values
+                self._spatial_normalizers['corridor_ratio'] = (corridor_ratios.min(), corridor_ratios.max())
+                
+        except Exception as e:
+            print(f"Warning: Failed to load spatial features: {e}")
+
+    def _normalize_spatial_features(self, features: List[float]) -> List[float]:
+        """Normalize spatial features to comparable scales."""
+        if len(features) != 4 or not self._spatial_normalizers:
+            return features
+        
+        elongation, convexity, room_count, corridor_ratio = features
+        
+        # elongation: log1p then min-max
+        elong_norm = np.log1p(elongation)
+        elong_min, elong_max = self._spatial_normalizers['elongation']
+        elong_norm = (elong_norm - elong_min) / (elong_max - elong_min + 1e-12)
+        
+        # convexity: already in [0,1]
+        convex_norm = convexity
+        
+        # room_count: log1p then min-max
+        room_norm = np.log1p(room_count)
+        room_min, room_max = self._spatial_normalizers['room_count']
+        room_norm = (room_norm - room_min) / (room_max - room_min + 1e-12)
+        
+        # corridor_ratio: min-max
+        corr_min, corr_max = self._spatial_normalizers['corridor_ratio']
+        corr_norm = (corridor_ratio - corr_min) / (corr_max - corr_min + 1e-12)
+        
+        return [elong_norm, convex_norm, room_norm, corr_norm]
+
+    def get_spatial_features(self, project_id: str) -> Optional[List[float]]:
+        """Get normalized spatial features for a project."""
+        if project_id not in self._spatial_features:
+            return None
+        raw_features = self._spatial_features[project_id]
+        return self._normalize_spatial_features(raw_features)
+
+    def spatial_distance(self, project_id1: str, project_id2: str) -> float:
+        """Compute Euclidean distance between normalized spatial features."""
+        features1 = self.get_spatial_features(project_id1)
+        features2 = self.get_spatial_features(project_id2)
+        
+        if features1 is None or features2 is None:
+            return 0.0  # Fallback to visual+attr only
+        
+        return np.linalg.norm(np.array(features1) - np.array(features2))
 
     def reload(self):
         with self._lock:
@@ -48,6 +133,8 @@ class FaissStore:
                 self._projects = pd.read_csv(self.meta_csv)
             else:
                 self._projects = pd.DataFrame([])
+            # Load spatial features
+            self._load_spatial_features()
 
     def _hydrate(self, idxs: List[int]) -> List[Dict[str, Any]]:
         rows = []

@@ -12,6 +12,18 @@ from PIL import Image
 from app.faiss_service import FaissStore, l2n
 from app.patches import compute_query_patches, rerank_by_patches
 
+# Spatial feature computation imports
+try:
+    from skimage import measure, morphology, filters, util
+    from skimage.measure import label, regionprops
+    from skimage.morphology import binary_closing, skeletonize
+    from skimage.filters import threshold_otsu
+    from scipy import ndimage
+    SPATIAL_AVAILABLE = True
+except ImportError:
+    SPATIAL_AVAILABLE = False
+    print("Warning: skimage/scipy not available, spatial features disabled")
+
 DATA_DIR = os.getenv("DATA_DIR", "data")
 app = FastAPI(title="Design Precedent Navigator API", version="0.2.0")
 
@@ -57,6 +69,65 @@ def embed_pil(pil: Image.Image) -> np.ndarray:
         vec = feat.cpu().numpy().astype("float32")
     return l2n(vec)[0]
 
+def compute_spatial_features(pil: Image.Image) -> Optional[List[float]]:
+    """Compute spatial features from a plan image."""
+    if not SPATIAL_AVAILABLE:
+        return None
+    
+    try:
+        # Convert to grayscale
+        gray = np.array(pil.convert("L"))
+        
+        # Extract floorplate mask
+        # Simple thresholding approach
+        threshold = threshold_otsu(gray)
+        binary = gray < threshold
+        
+        # Clean up the binary image
+        binary = binary_closing(binary)
+        
+        # Find largest connected component (assumed to be the floorplate)
+        labeled = label(binary)
+        if labeled.max() == 0:
+            return None
+        
+        props = regionprops(labeled)
+        largest_comp = max(props, key=lambda x: x.area)
+        floorplate = labeled == largest_comp.label
+        
+        # Compute spatial metrics
+        # Elongation = major_axis_length / minor_axis_length
+        elongation = largest_comp.major_axis_length / largest_comp.minor_axis_length
+        
+        # Convexity = area(floorplate) / area(convex_hull)
+        hull = morphology.convex_hull_image(floorplate)
+        convexity = largest_comp.area / np.sum(hull)
+        convexity = np.clip(convexity, 0.0, 1.0)
+        
+        # Extract space mask (floorplate minus thickened walls)
+        edges = morphology.binary_dilation(floorplate) & ~floorplate
+        thickened_edges = morphology.binary_dilation(edges, morphology.disk(3))
+        space_mask = floorplate & ~thickened_edges
+        
+        # Room count = connected components with sufficient area
+        min_area = 0.002 * largest_comp.area  # 0.2% of floorplate area
+        space_labeled = label(space_mask)
+        space_props = regionprops(space_labeled)
+        room_count = sum(1 for p in space_props if p.area >= min_area)
+        
+        # Corridor ratio = skeleton density
+        if np.sum(space_mask) > 0:
+            skeleton = skeletonize(space_mask)
+            corridor_ratio = np.sum(skeleton) / np.sum(space_mask)
+        else:
+            corridor_ratio = 0.0
+        
+        return [elongation, convexity, room_count, corridor_ratio]
+        
+    except Exception as e:
+        print(f"Error computing spatial features: {e}")
+        return None
+
 # Non-blocking warm-up on startup so health is instant
 @app.on_event("startup")
 async def _startup_warm():
@@ -81,6 +152,7 @@ class SearchById(BaseModel):
     class Weights(BaseModel):
         visual: float = 1.0
         attr: float = 0.25
+        spatial: float = 0.6
 
     filters: Filters = Filters()
     weights: Weights = Weights()
@@ -98,6 +170,7 @@ class Filters(BaseModel):
 class Weights(BaseModel):
     visual: float = 1.0
     attr: float = 0.25
+    spatial: float = 0.6
 
 class SearchOpts(BaseModel):
     top_k: int = 12
@@ -118,7 +191,9 @@ def attr_distance(row: dict, f: Filters) -> float:
     mismatches = sum(1 for ok in checks if not ok)
     return mismatches / len(checks)
 
-def fuse_and_sort(results: List[dict], D: np.ndarray, weights: Weights, filters: Filters, strict: bool = False) -> List[dict]:
+def fuse_and_sort(results: List[dict], D: np.ndarray, weights: Weights, filters: Filters, 
+                 strict: bool = False, query_spatial_features: Optional[List[float]] = None, 
+                 store: Optional[FaissStore] = None) -> List[dict]:
     dv = np.array(D, dtype="float32")
     if dv.size > 1:
         dv = (dv - dv.min()) / (dv.max() - dv.min() + 1e-12)
@@ -130,7 +205,15 @@ def fuse_and_sort(results: List[dict], D: np.ndarray, weights: Weights, filters:
         da = attr_distance(r, filters)
         if strict and da > 0.0:
             continue
-        score = weights.visual * float(dv[j]) + weights.attr * float(da)
+        
+        # Compute spatial distance if available
+        ds = 0.0
+        if query_spatial_features is not None and store is not None and r.get("project_id"):
+            candidate_features = store.get_spatial_features(r["project_id"])
+            if candidate_features is not None:
+                ds = np.linalg.norm(np.array(query_spatial_features) - np.array(candidate_features))
+        
+        score = weights.visual * float(dv[j]) + weights.attr * float(da) + weights.spatial * float(ds)
         fused.append((score, r))
     fused.sort(key=lambda x: x[0])
     return [r for _, r in fused]
@@ -158,7 +241,7 @@ def search_id(body: SearchById):
     D, I = st.search(q, body.top_k)
     ms = int((time.time() - t0) * 1000)
     hydrated = st.results_payload(D, I)
-    fused = fuse_and_sort(hydrated, D, body.weights, body.filters, strict=body.strict)
+    fused = fuse_and_sort(hydrated, D, body.weights, body.filters, strict=body.strict, store=st)
     return {
         "latency_ms": ms,
         "weights": body.weights.model_dump(),
@@ -225,10 +308,12 @@ async def search_file(
     massing_type: Optional[str] = None,
     w_visual: float = 1.0,
     w_attr: float = 0.25,
+    w_spatial: float = 0.6,
     strict: bool = False,
     rerank: bool = False,
     re_topk: int = 50,
     patches: int = 16,
+    mode: Optional[str] = None,
 ):
     st = get_store()
     try:
@@ -245,8 +330,43 @@ async def search_file(
     ms = int((time.time() - t0) * 1000)
     hydrated = st.results_payload(D, I)
     f = Filters(typology=typology, climate_bin=climate_bin, massing_type=massing_type)
-    w = Weights(visual=w_visual, attr=w_attr)
-    fused = fuse_and_sort(hydrated, D, w, f, strict=strict)
+    w = Weights(visual=w_visual, attr=w_attr, spatial=w_spatial)
+    
+    # Compute spatial features if in plan mode
+    query_spatial_features = None
+    debug_spatial = None
+    if mode == "plan" or mode == "true":
+        query_spatial_features = compute_spatial_features(pil)
+        if query_spatial_features is not None:
+            # Create debug info with query features and top-3 candidates
+            debug_spatial = {
+                "query_features": {
+                    "elongation": query_spatial_features[0],
+                    "convexity": query_spatial_features[1],
+                    "room_count": query_spatial_features[2],
+                    "corridor_ratio": query_spatial_features[3]
+                },
+                "top_candidates": []
+            }
+            
+            # Add top-3 candidates' spatial features
+            for i, result in enumerate(hydrated[:3]):
+                if result.get("project_id"):
+                    candidate_features = st.get_spatial_features(result["project_id"])
+                    if candidate_features is not None:
+                        debug_spatial["top_candidates"].append({
+                            "rank": i + 1,
+                            "project_id": result["project_id"],
+                            "features": {
+                                "elongation": candidate_features[0],
+                                "convexity": candidate_features[1],
+                                "room_count": candidate_features[2],
+                                "corridor_ratio": candidate_features[3]
+                            }
+                        })
+    
+    fused = fuse_and_sort(hydrated, D, w, f, strict=strict, 
+                         query_spatial_features=query_spatial_features, store=st)
     
     # Apply patch reranking if requested
     debug_info = {}
@@ -271,10 +391,15 @@ async def search_file(
     else:
         final_results = fused[:top_k]
     
+    # Combine debug info
+    combined_debug = debug_info.copy() if debug_info else {}
+    if debug_spatial is not None:
+        combined_debug["spatial"] = debug_spatial
+    
     return {
         "latency_ms": ms,
         "weights": w.model_dump(),
         "filters": f.model_dump(),
         "results": final_results,
-        "debug": debug_info
+        "debug": combined_debug
     }

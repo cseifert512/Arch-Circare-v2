@@ -21,6 +21,7 @@ export interface FilterOptions {
 export interface Weights {
   visual: number;
   attr: number;
+  spatial: number;
 }
 
 export async function searchFileWithFilters(file: File, opts: {
@@ -29,7 +30,8 @@ export async function searchFileWithFilters(file: File, opts: {
   weights?: Weights,
   strict?: boolean,
   rerank?: boolean,
-  reTopK?: number
+  reTopK?: number,
+  planMode?: boolean
 } = {}) {
   const fd = new FormData();
   fd.append('file', file);
@@ -43,8 +45,12 @@ export async function searchFileWithFilters(file: File, opts: {
   
   if (opts.weights?.visual !== undefined) params.append('w_visual', opts.weights.visual.toString());
   if (opts.weights?.attr !== undefined) params.append('w_attr', opts.weights.attr.toString());
+  if (opts.weights?.spatial !== undefined) params.append('w_spatial', opts.weights.spatial.toString());
   
   if (opts.strict) params.append('strict', 'true');
+  
+  // Add plan mode parameter
+  if (opts.planMode) params.append('mode', 'plan');
   
   // Add patch rerank parameters
   if (opts.rerank) {

@@ -28,6 +28,24 @@ interface SearchResponse {
     patches?: number;
     moved?: number;
     rerank_latency_ms?: number;
+    spatial?: {
+      query_features: {
+        elongation: number;
+        convexity: number;
+        room_count: number;
+        corridor_ratio: number;
+      };
+      top_candidates: Array<{
+        rank: number;
+        project_id: string;
+        features: {
+          elongation: number;
+          convexity: number;
+          room_count: number;
+          corridor_ratio: number;
+        };
+      }>;
+    };
   };
 }
 
@@ -40,9 +58,10 @@ export default function App() {
   const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<FilterOptions>({});
-  const [currentWeights, setCurrentWeights] = useState<Weights>({ visual: 1.0, attr: 0.25 });
+  const [currentWeights, setCurrentWeights] = useState<Weights>({ visual: 1.0, attr: 0.25, spatial: 0.0 });
   const [currentRerank, setCurrentRerank] = useState<PatchRerankOptions>({ enabled: false, reTopK: 48 });
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [planMode, setPlanMode] = useState(false);
 
   const handleSearchResults = (response: SearchResponse) => {
     setResults(response.results || []);
@@ -54,6 +73,9 @@ export default function App() {
       console.log('Search debug info:', response.debug);
       if (response.debug.moved !== undefined) {
         console.log(`Rerank moved ${response.debug.moved} items`);
+      }
+      if (response.debug.spatial) {
+        console.log('Spatial debug info:', response.debug.spatial);
       }
     }
   };
@@ -100,6 +122,8 @@ export default function App() {
   const handleFiltersChange = (filters: FilterOptions, weights: Weights) => {
     setCurrentFilters(filters);
     setCurrentWeights(weights);
+    // Update plan mode based on spatial weight
+    setPlanMode(weights.spatial > 0);
   };
 
   const handleRerankChange = (rerankOptions: PatchRerankOptions) => {
@@ -135,6 +159,7 @@ export default function App() {
       <FilterControls 
         onFiltersChange={handleFiltersChange}
         disabled={isLoading}
+        spatialDebug={debugInfo?.spatial}
       />
       
       <FilterChips 
@@ -155,6 +180,7 @@ export default function App() {
         filters={currentFilters}
         weights={currentWeights}
         rerank={currentRerank}
+        planMode={planMode}
       />
       
       {uploadedImageUrl && (

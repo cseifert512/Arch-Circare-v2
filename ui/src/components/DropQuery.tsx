@@ -17,6 +17,31 @@ interface SearchResult {
 interface SearchResponse {
   latency_ms: number;
   results: SearchResult[];
+  debug?: {
+    rerank?: string;
+    re_topk?: number;
+    patches?: number;
+    moved?: number;
+    rerank_latency_ms?: number;
+    spatial?: {
+      query_features: {
+        elongation: number;
+        convexity: number;
+        room_count: number;
+        corridor_ratio: number;
+      };
+      top_candidates: Array<{
+        rank: number;
+        project_id: string;
+        features: {
+          elongation: number;
+          convexity: number;
+          room_count: number;
+          corridor_ratio: number;
+        };
+      }>;
+    };
+  };
 }
 
 interface DropQueryProps {
@@ -27,9 +52,10 @@ interface DropQueryProps {
   filters?: FilterOptions;
   weights?: Weights;
   rerank?: PatchRerankOptions;
+  planMode?: boolean;
 }
 
-export default function DropQuery({ onSearchStart, onSearchComplete, onSearchResults, onImageUpload, filters, weights, rerank }: DropQueryProps) {
+export default function DropQuery({ onSearchStart, onSearchComplete, onSearchResults, onImageUpload, filters, weights, rerank, planMode }: DropQueryProps) {
 	const [isDragging, setIsDragging] = useState(false);
 	const [status, setStatus] = useState<string>("");
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -51,7 +77,8 @@ export default function DropQuery({ onSearchStart, onSearchComplete, onSearchRes
 				weights,
 				strict: false,
 				rerank: rerank?.enabled,
-				reTopK: rerank?.reTopK
+				reTopK: rerank?.reTopK,
+				planMode
 			});
 			console.log("Search results:", json);
 			setStatus(`Done. ${json?.results?.length ?? 0} results`);
@@ -62,7 +89,7 @@ export default function DropQuery({ onSearchStart, onSearchComplete, onSearchRes
 		} finally {
 			onSearchComplete?.();
 		}
-	}, [onSearchStart, onSearchComplete, onSearchResults, onImageUpload, filters, weights, rerank]);
+	}, [onSearchStart, onSearchComplete, onSearchResults, onImageUpload, filters, weights, rerank, planMode]);
 
 	return (
 		<div style={{ display: "grid", gap: 12 }}>

@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import DropQuery from './components/DropQuery';
 import ResultsGrid from './components/ResultsGrid';
 import Lightbox from './components/Lightbox';
-import FilterControls, { type FilterOptions, type Weights } from './components/FilterControls';
+import FilterControls, { type FilterOptions } from './components/FilterControls';
+import { type Weights } from './components/TriSlider';
 import FilterChips from './components/FilterChips';
 import PatchRerankControls, { type PatchRerankOptions } from './components/PatchRerankControls';
+import TelemetryDisplay from './components/TelemetryDisplay';
 import { getProjectImages, API_BASE } from './lib/api';
 
 interface SearchResult {
@@ -23,6 +25,8 @@ interface SearchResponse {
   latency_ms: number;
   results: SearchResult[];
   debug?: {
+    weights_requested?: Weights;
+    weights_effective?: Weights;
     rerank?: string;
     re_topk?: number;
     patches?: number;
@@ -61,7 +65,6 @@ export default function App() {
   const [currentWeights, setCurrentWeights] = useState<Weights>({ visual: 1.0, attr: 0.25, spatial: 0.0 });
   const [currentRerank, setCurrentRerank] = useState<PatchRerankOptions>({ enabled: false, reTopK: 48 });
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
-  const [planMode, setPlanMode] = useState(false);
 
   const handleSearchResults = (response: SearchResponse) => {
     setResults(response.results || []);
@@ -71,6 +74,9 @@ export default function App() {
     // Log debug info if available
     if (response.debug) {
       console.log('Search debug info:', response.debug);
+      if (response.debug.weights_effective) {
+        console.log('Effective weights:', response.debug.weights_effective);
+      }
       if (response.debug.moved !== undefined) {
         console.log(`Rerank moved ${response.debug.moved} items`);
       }
@@ -84,6 +90,7 @@ export default function App() {
     setIsLoading(true);
     setResults([]);
     setLatency(undefined);
+    setDebugInfo(undefined);
   };
 
   const handleImageUpload = (imageUrl: string) => {
@@ -122,8 +129,6 @@ export default function App() {
   const handleFiltersChange = (filters: FilterOptions, weights: Weights) => {
     setCurrentFilters(filters);
     setCurrentWeights(weights);
-    // Update plan mode based on spatial weight
-    setPlanMode(weights.spatial > 0);
   };
 
   const handleRerankChange = (rerankOptions: PatchRerankOptions) => {
@@ -160,6 +165,7 @@ export default function App() {
         onFiltersChange={handleFiltersChange}
         disabled={isLoading}
         spatialDebug={debugInfo?.spatial}
+        effectiveWeights={debugInfo?.weights_effective}
       />
       
       <FilterChips 
@@ -180,7 +186,12 @@ export default function App() {
         filters={currentFilters}
         weights={currentWeights}
         rerank={currentRerank}
-        planMode={planMode}
+      />
+      
+      {/* Telemetry Display */}
+      <TelemetryDisplay 
+        latency={latency}
+        debug={debugInfo}
       />
       
       {uploadedImageUrl && (

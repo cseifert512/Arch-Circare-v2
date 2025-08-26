@@ -18,6 +18,8 @@ interface SearchResponse {
   latency_ms: number;
   results: SearchResult[];
   debug?: {
+    weights_requested?: Weights;
+    weights_effective?: Weights;
     rerank?: string;
     re_topk?: number;
     patches?: number;
@@ -52,10 +54,17 @@ interface DropQueryProps {
   filters?: FilterOptions;
   weights?: Weights;
   rerank?: PatchRerankOptions;
-  planMode?: boolean;
 }
 
-export default function DropQuery({ onSearchStart, onSearchComplete, onSearchResults, onImageUpload, filters, weights, rerank, planMode }: DropQueryProps) {
+export default function DropQuery({ 
+  onSearchStart, 
+  onSearchComplete, 
+  onSearchResults, 
+  onImageUpload, 
+  filters, 
+  weights, 
+  rerank 
+}: DropQueryProps) {
 	const [isDragging, setIsDragging] = useState(false);
 	const [status, setStatus] = useState<string>("");
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -70,6 +79,9 @@ export default function DropQuery({ onSearchStart, onSearchComplete, onSearchRes
 			// Create object URL for the uploaded image
 			const imageUrl = URL.createObjectURL(file);
 			onImageUpload?.(imageUrl);
+			
+			// Determine if we should use plan mode based on spatial weight
+			const planMode = weights?.spatial && weights.spatial > 0 ? true : undefined;
 			
 			const json = await searchFileWithFilters(file, {
 				topK: 12,
@@ -89,7 +101,7 @@ export default function DropQuery({ onSearchStart, onSearchComplete, onSearchRes
 		} finally {
 			onSearchComplete?.();
 		}
-	}, [onSearchStart, onSearchComplete, onSearchResults, onImageUpload, filters, weights, rerank, planMode]);
+	}, [onSearchStart, onSearchComplete, onSearchResults, onImageUpload, filters, weights, rerank]);
 
 	return (
 		<div style={{ display: "grid", gap: 12 }}>

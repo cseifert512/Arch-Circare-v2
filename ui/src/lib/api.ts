@@ -82,5 +82,37 @@ export async function getProjectImages(projectId: string): Promise<ProjectImages
   return res.json();
 }
 
+export interface FeedbackRequest {
+  session_id: string;
+  query_id: string;
+  liked: string[];
+  disliked: string[];
+  weights_before?: Weights;
+}
+
+export interface FeedbackResponse {
+  ok: boolean;
+  session_id: string;
+  query_id: string;
+  weights_after: Weights;
+  nudges: {
+    visual: string;
+    spatial: string;
+    attr: string;
+  };
+}
+
+export async function sendFeedback(feedback: FeedbackRequest): Promise<FeedbackResponse> {
+  const res = await fetch(`${BASE}/feedback`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(feedback),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 
 

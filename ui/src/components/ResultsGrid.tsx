@@ -1,4 +1,5 @@
 import { API_BASE } from '../lib/api';
+import FeedbackButtons from './FeedbackButtons';
 
 interface SearchResult {
   rank: number;
@@ -42,6 +43,9 @@ interface ResultsGridProps {
     };
   };
   onOpenGallery?: (projectId: string, initialImageId?: string) => void;
+  onFeedback?: (imageId: string, isLiked: boolean) => void;
+  feedbackState?: Record<string, 'liked' | 'disliked' | undefined>;
+  queryId?: string;
 }
 
 // Component for spatial metrics tooltip
@@ -109,7 +113,7 @@ function SpatialMetricsTooltip({ projectId, spatialDebug }: {
   );
 }
 
-export default function ResultsGrid({ results, isLoading, latency, debug, onOpenGallery }: ResultsGridProps) {
+export default function ResultsGrid({ results, isLoading, latency, debug, onOpenGallery, onFeedback, feedbackState, queryId }: ResultsGridProps) {
   if (isLoading) {
     return (
       <div style={{ marginTop: 24 }}>
@@ -316,6 +320,13 @@ export default function ResultsGrid({ results, isLoading, latency, debug, onOpen
             }}>
               Distance: {result.distance.toFixed(3)}
             </div>
+            <FeedbackButtons 
+              imageId={result.image_id} 
+              isLiked={feedbackState?.[result.image_id] === 'liked'} 
+              isDisliked={feedbackState?.[result.image_id] === 'disliked'} 
+              onLike={(imageId) => onFeedback?.(imageId, true)}
+              onDislike={(imageId) => onFeedback?.(imageId, false)}
+            />
           </div>
         ))}
       </div>

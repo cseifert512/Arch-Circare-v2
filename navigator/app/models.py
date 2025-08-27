@@ -2,9 +2,9 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Optional
 
 class Weights(BaseModel):
-    visual: float = Field(0.6, ge=0.0, le=1.0)
-    spatial: float = Field(0.2, ge=0.0, le=1.0)
-    attr: float = Field(0.2, ge=0.0, le=1.0)
+    visual: float = Field(1.0, ge=0.0, le=1.0)
+    spatial: float = Field(0.0, ge=0.0, le=1.0)
+    attr: float = Field(0.25, ge=0.0, le=1.0)
 
 class Filters(BaseModel):
     typology: Optional[List[str]] = None
@@ -34,9 +34,11 @@ class SearchResponse(BaseModel):
     results: List[SearchResult]
 
 class Feedback(BaseModel):
+    session_id: str
     query_id: str
     liked: List[str] = []  # image_ids
     disliked: List[str] = []
+    weights_before: Optional[Weights] = None  # client echo; optional
 
 class EmbedResponse(BaseModel):
     vector: List[float]

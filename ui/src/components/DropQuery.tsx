@@ -50,7 +50,7 @@ interface DropQueryProps {
   onSearchStart?: () => void;
   onSearchComplete?: () => void;
   onSearchResults?: (response: SearchResponse) => void;
-  onImageUpload?: (imageUrl: string) => void;
+  onImageUpload?: (imageUrl: string, file: File) => void;
   filters?: FilterOptions;
   weights?: Weights;
   rerank?: PatchRerankOptions;
@@ -78,7 +78,7 @@ export default function DropQuery({
 			
 			// Create object URL for the uploaded image
 			const imageUrl = URL.createObjectURL(file);
-			onImageUpload?.(imageUrl);
+			onImageUpload?.(imageUrl, file);
 			
 			// Determine if we should use plan mode based on spatial weight
 			const planMode = weights?.spatial && weights.spatial > 0 ? true : undefined;

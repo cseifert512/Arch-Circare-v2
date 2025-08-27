@@ -11,6 +11,8 @@ from PIL import Image
 
 from app.faiss_service import FaissStore, l2n
 from app.patches import compute_query_patches, rerank_by_patches
+from app.session import SessionStore, generate_query_id, compute_weight_nudges, apply_weight_nudges
+from app.models import Feedback, Weights
 
 # Spatial feature computation imports
 try:
@@ -43,6 +45,7 @@ app.mount("/plans", StaticFiles(directory=os.path.join(DATA_DIR, "plans")), name
 _store: FaissStore | None = None
 _model = None
 _transform = None
+_session_store: SessionStore | None = None
 
 def get_store() -> FaissStore:
     global _store
@@ -60,6 +63,12 @@ def get_model_and_transform():
         _transform = timm.data.create_transform(**cfg, is_training=False)
         _model = model
     return _model, _transform
+
+def get_session_store() -> SessionStore:
+    global _session_store
+    if _session_store is None:
+        _session_store = SessionStore(DATA_DIR)
+    return _session_store
 
 def embed_pil(pil: Image.Image) -> np.ndarray:
     model, tfm = get_model_and_transform()
@@ -135,17 +144,13 @@ async def _startup_warm():
         try:
             get_store()
             get_model_and_transform()
+            get_session_store()
         except Exception:
             # Avoid crashing startup on warm errors
             pass
     threading.Thread(target=_warm, daemon=True).start()
 
 # Sprint A: Updated request models
-class Weights(BaseModel):
-    visual: float = 1.0
-    spatial: float = 0.0
-    attr: float = 0.25
-
 class Filters(BaseModel):
     typology: Optional[str] = None
     climate_bin: Optional[str] = None
@@ -277,6 +282,9 @@ def search_id(body: SearchById):
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     
+    # Generate query ID
+    query_id = generate_query_id()
+    
     t0 = time.time()
     D, I = st.search(q, body.top_k)
     ms = int((time.time() - t0) * 1000)
@@ -295,8 +303,10 @@ def search_id(body: SearchById):
                                         store=st)
     
     return {
+        "query_id": query_id,
         "latency_ms": ms,
         "weights": body.weights.model_dump(),
+        "weights_effective": debug["weights_effective"],
         "filters": body.filters.model_dump(),
         "results": fused_results,
         "debug": debug
@@ -450,10 +460,63 @@ async def search_file(
     if debug_spatial is not None:
         debug_info["spatial"] = debug_spatial
     
+    # Generate query ID
+    query_id = generate_query_id()
+    
     return {
+        "query_id": query_id,
         "latency_ms": ms,
         "weights": w.model_dump(),
+        "weights_effective": debug_info["weights_effective"],
         "filters": f.model_dump(),
         "results": final_results,
         "debug": debug_info
+    }
+
+@app.post("/feedback")
+def feedback(body: Feedback):
+    """Handle user feedback and update session weights"""
+    session_store = get_session_store()
+    
+    # Get current session
+    session_data = session_store.get_session(body.session_id)
+    weights_before = session_data.weights
+    
+    # Compute nudges based on feedback
+    nudges = compute_weight_nudges(
+        liked=body.liked,
+        disliked=body.disliked,
+        weights_before=weights_before,
+        debug_info=None  # We could store debug info in session for more sophisticated nudging
+    )
+    
+    # Apply nudges to get new weights
+    weights_after = apply_weight_nudges(weights_before, nudges)
+    
+    # Update session
+    session_store.update_session(body.session_id, body.query_id, weights_after)
+    
+    # Log the feedback event
+    session_store.log_feedback(
+        session_id=body.session_id,
+        query_id=body.query_id,
+        liked=body.liked,
+        disliked=body.disliked,
+        weights_before=weights_before,
+        weights_after=weights_after
+    )
+    
+    # Format nudges for response
+    nudges_formatted = {
+        "visual": f"{nudges['visual']:+.2f}",
+        "spatial": f"{nudges['spatial']:+.2f}",
+        "attr": f"{nudges['attr']:+.2f}"
+    }
+    
+    return {
+        "ok": True,
+        "session_id": body.session_id,
+        "query_id": body.query_id,
+        "weights_after": weights_after.model_dump(),
+        "nudges": nudges_formatted
     }

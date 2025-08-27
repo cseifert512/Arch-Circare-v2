@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import TriSlider, { type Weights } from './TriSlider';
 
 export interface FilterOptions {
@@ -19,6 +19,7 @@ interface FilterControlsProps {
     };
   };
   effectiveWeights?: Weights;
+  currentWeights?: Weights;
 }
 
 // Available filter options based on the projects.csv data
@@ -51,10 +52,25 @@ export default function FilterControls({
   onFiltersChange, 
   disabled = false, 
   spatialDebug,
-  effectiveWeights 
+  effectiveWeights,
+  currentWeights
 }: FilterControlsProps) {
   const [filters, setFilters] = useState<FilterOptions>({});
-  const [weights, setWeights] = useState<Weights>({ visual: 1.0, attr: 0.25, spatial: 0.0 });
+  const [weights, setWeights] = useState<Weights>(currentWeights || { visual: 1.0, attr: 0.25, spatial: 0.0 });
+
+  // Update weights when currentWeights prop changes
+  useEffect(() => {
+    if (currentWeights) {
+      setWeights(currentWeights);
+    }
+  }, [currentWeights]);
+
+  // Check if weights are personalized (different from defaults)
+  const isPersonalized = currentWeights && (
+    Math.abs(currentWeights.visual - 1.0) > 0.01 ||
+    Math.abs(currentWeights.attr - 0.25) > 0.01 ||
+    Math.abs(currentWeights.spatial - 0.0) > 0.01
+  );
 
   const handleFilterChange = (key: keyof FilterOptions, value: string) => {
     const newFilters = { ...filters };
@@ -94,12 +110,30 @@ export default function FilterControls({
       marginBottom: 16
     }}>
       {/* TriSlider Component */}
-      <TriSlider
-        weights={weights}
-        onWeightsChange={handleWeightsChange}
-        effectiveWeights={effectiveWeights}
-        disabled={disabled}
-      />
+      <div style={{ position: 'relative' }}>
+        <TriSlider
+          weights={weights}
+          onWeightsChange={handleWeightsChange}
+          effectiveWeights={effectiveWeights}
+          disabled={disabled}
+        />
+        {isPersonalized && (
+          <div style={{
+            position: 'absolute',
+            top: -8,
+            right: 0,
+            backgroundColor: '#10b981',
+            color: 'white',
+            padding: '2px 8px',
+            borderRadius: 12,
+            fontSize: 11,
+            fontWeight: 500,
+            zIndex: 10
+          }}>
+            personalized
+          </div>
+        )}
+      </div>
 
       {/* Filters Section */}
       <div style={{

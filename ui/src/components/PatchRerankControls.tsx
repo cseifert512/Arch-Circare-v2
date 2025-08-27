@@ -114,7 +114,7 @@ export default function PatchRerankControls({ onRerankChange, disabled = false }
               borderRadius: 8,
               fontSize: 13,
               lineHeight: 1.4,
-              maxWidth: 280,
+              maxWidth: 400,
               zIndex: 1000,
               boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
               border: '1px solid #374151'

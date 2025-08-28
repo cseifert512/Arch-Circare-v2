@@ -1,0 +1,46 @@
+faiss_id,image_id,project_id,x,y,thumb_url,title,country,typology
+0,i_p_0001_hero2,p_0001,-0.33333152532577515,0.812384843826294,/images/p_0001/hero2.jpeg,,,
+1,i_p_0001_hero3,p_0001,-0.3748478889465332,0.9589711427688599,/images/p_0001/hero3.jpg,,,
+2,i_p_0001_hero4,p_0001,-0.4884667992591858,0.6257466077804565,/images/p_0001/hero4.jpg,,,
+3,i_p_ando_churchlight_facade,p_ando_churchlight,-0.49345993995666504,0.7946752309799194,/images/p_ando_churchlight/facade.jpg,Church of the Light,Japan,religious
+4,i_p_ando_churchlight_hero,p_ando_churchlight,-0.5343847274780273,0.6049191951751709,/images/p_ando_churchlight/hero.jpeg,Church of the Light,Japan,religious
+5,i_p_ando_churchlight_plan,p_ando_churchlight,0.986038327217102,-0.937407910823822,/images/p_ando_churchlight/plan.jpg,Church of the Light,Japan,religious
+6,i_p_big_8house_facade,p_big_8house,-0.9264280200004578,0.7604060173034668,/images/p_big_8house/facade.jpg,8 House,Denmark,midrise_housing
+7,i_p_big_8house_hero,p_big_8house,-1.0,0.8262126445770264,/images/p_big_8house/hero.jpg,8 House,Denmark,midrise_housing
+8,i_p_big_8house_plan,p_big_8house,0.831640362739563,-0.9714375734329224,/images/p_big_8house/plan.jpg,8 House,Denmark,midrise_housing
+9,i_p_corbu_unite_facade,p_corbu_unite,-0.8270583748817444,0.7275488376617432,/images/p_corbu_unite/facade.jpg,Unité d'Habitation,France,midrise_housing
+10,i_p_corbu_unite_hero,p_corbu_unite,-0.6200628280639648,0.7970138788223267,/images/p_corbu_unite/hero.jpg,Unité d'Habitation,France,midrise_housing
+11,i_p_corbu_unite_plan,p_corbu_unite,0.8750081062316895,-1.0,/images/p_corbu_unite/plan.jpg,Unité d'Habitation,France,midrise_housing
+12,i_p_demo01_facade,p_demo01,-0.5861473679542542,0.9362136125564575,/images/p_demo01/facade.jpg,,,
+13,i_p_demo01_hero,p_demo01,-0.3854900002479553,0.884743332862854,/images/p_demo01/hero.jpg,,,
+14,i_p_demo01_plan,p_demo01,0.6793802976608276,-0.8295907378196716,/images/p_demo01/plan.jpg,,,
+15,i_p_demo02_facade,p_demo02,-0.4274824857711792,0.6598103046417236,/images/p_demo02/facade.jpg,,,
+16,i_p_demo02_hero,p_demo02,-0.3396328091621399,0.9143587350845337,/images/p_demo02/hero.jpg,,,
+17,i_p_demo02_plan,p_demo02,0.7670077085494995,-0.8058154582977295,/images/p_demo02/plan.jpg,,,
+18,i_p_kahn_salk_facade,p_kahn_salk,-0.7116713523864746,0.689460277557373,/images/p_kahn_salk/facade.jpg,Salk Institute,USA,education
+19,i_p_kahn_salk_hero,p_kahn_salk,-0.5709784030914307,0.6808706521987915,/images/p_kahn_salk/hero.jpg,Salk Institute,USA,education
+20,i_p_kahn_salk_plan,p_kahn_salk,0.9367399215698242,-0.8735806941986084,/images/p_kahn_salk/plan.jpg,Salk Institute,USA,education
+21,i_p_kere_gando_facade,p_kere_gando,-0.6767724752426147,0.5610843896865845,/images/p_kere_gando/facade.jpg,Gando Primary School,Burkina Faso,education
+22,i_p_kere_gando_hero,p_kere_gando,-0.5222290754318237,0.5440144538879395,/images/p_kere_gando/hero.jpg,Gando Primary School,Burkina Faso,education
+23,i_p_kere_gando_plan,p_kere_gando,0.73326575756073,-0.9051645398139954,/images/p_kere_gando/plan.jpg,Gando Primary School,Burkina Faso,education
+24,i_p_lacatonfrac_facade,p_lacatonfrac,-0.7643329501152039,0.6385934352874756,/images/p_lacatonfrac/facade.jpg,FRAC Nord-Pas de Calais,France,cultural
+25,i_p_lacatonfrac_hero,p_lacatonfrac,-0.6901763081550598,0.7789058685302734,/images/p_lacatonfrac/hero.jpg,FRAC Nord-Pas de Calais,France,cultural
+26,i_p_lacatonfrac_plan,p_lacatonfrac,0.7560344934463501,-0.8615891933441162,/images/p_lacatonfrac/plan.jpg,FRAC Nord-Pas de Calais,France,cultural
+27,i_p_mies_barcelona_facade,p_mies_barcelona,-0.3450477719306946,0.7018003463745117,/images/p_mies_barcelona/facade.jpg,Barcelona Pavilion,Spain,cultural
+28,i_p_mies_barcelona_hero,p_mies_barcelona,-0.30046921968460083,0.7413699626922607,/images/p_mies_barcelona/hero.jpg,Barcelona Pavilion,Spain,cultural
+29,i_p_mies_barcelona_plan,p_mies_barcelona,0.8847322463989258,-0.9373042583465576,/images/p_mies_barcelona/plan.jpg,Barcelona Pavilion,Spain,cultural
+30,i_p_mvrdv_markthal_facade,p_mvrdv_markthal,-0.8287581205368042,0.9145315885543823,/images/p_mvrdv_markthal/facade.jpg,Markthal,Netherlands,mixed_use
+31,i_p_mvrdv_markthal_hero,p_mvrdv_markthal,-0.8677563667297363,0.9133527278900146,/images/p_mvrdv_markthal/hero.jpg,Markthal,Netherlands,mixed_use
+32,i_p_mvrdv_markthal_plan,p_mvrdv_markthal,1.0,-0.8438782691955566,/images/p_mvrdv_markthal/plan.jpg,Markthal,Netherlands,mixed_use
+33,i_p_oma_casadamusica_facade,p_oma_casadamusica,-0.510939359664917,0.9024217128753662,/images/p_oma_casadamusica/facade.jpg,Casa da Música,Portugal,cultural
+34,i_p_oma_casadamusica_hero,p_oma_casadamusica,-0.9910772442817688,0.88535475730896,/images/p_oma_casadamusica/hero.jpg,Casa da Música,Portugal,cultural
+35,i_p_oma_casadamusica_plan,p_oma_casadamusica,0.6895133256912231,-0.9505187273025513,/images/p_oma_casadamusica/plan.jpg,Casa da Música,Portugal,cultural
+36,i_p_sanaa_rolex_facade,p_sanaa_rolex,-0.7386602163314819,0.8606407642364502,/images/p_sanaa_rolex/facade.jpg,Rolex Learning Center,Switzerland,education
+37,i_p_sanaa_rolex_hero,p_sanaa_rolex,-0.8714969158172607,0.8297111988067627,/images/p_sanaa_rolex/hero.jpg,Rolex Learning Center,Switzerland,education
+38,i_p_sanaa_rolex_plan,p_sanaa_rolex,0.8665976524353027,-0.7543601989746094,/images/p_sanaa_rolex/plan.jpg,Rolex Learning Center,Switzerland,education
+39,i_p_test01_facade,p_test01,-0.6683441400527954,1.0,/images/p_test01/facade.jpg,,,
+40,i_p_test01_hero,p_test01,-0.41292691230773926,0.9520378112792969,/images/p_test01/hero.jpg,,,
+41,i_p_test01_plan,p_test01,0.8250014781951904,-0.8488795757293701,/images/p_test01/plan.jpg,,,
+42,i_p_test02_facade,p_test02,-0.5964863300323486,0.9610990285873413,/images/p_test02/facade.jpg,,,
+43,i_p_test02_hero,p_test02,-0.296314537525177,0.9396852254867554,/images/p_test02/hero.jpg,,,
+44,i_p_test02_plan,p_test02,0.8561058044433594,-0.7835256457328796,/images/p_test02/plan.jpg,,,

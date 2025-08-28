@@ -23,6 +23,10 @@ interface ResultsGridProps {
     patches?: number;
     moved?: number;
     rerank_latency_ms?: number;
+    lens?: {
+      ids: number;
+      projects: number;
+    };
     spatial?: {
       query_features: {
         elongation: number;
@@ -216,6 +220,21 @@ export default function ResultsGrid({ results, isLoading, latency, debug, onOpen
               marginRight: 8
             }}>
               Plan mode active
+            </span>
+          )}
+          {debug?.lens && debug.lens.ids > 0 && (
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '2px 8px',
+              backgroundColor: '#fef3c7',
+              color: '#92400e',
+              borderRadius: 12,
+              fontSize: 12,
+              fontWeight: 500,
+              marginRight: 8
+            }}>
+              Neighborhood lens: {debug.lens.ids}
             </span>
           )}
         </div>

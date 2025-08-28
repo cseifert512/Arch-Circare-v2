@@ -31,7 +31,8 @@ export async function searchFileWithFilters(file: File, opts: {
   strict?: boolean,
   rerank?: boolean,
   reTopK?: number,
-  planMode?: boolean
+  planMode?: boolean,
+  lensImageIds?: string[]
 } = {}) {
   const fd = new FormData();
   fd.append('file', file);
@@ -51,6 +52,11 @@ export async function searchFileWithFilters(file: File, opts: {
   
   // Add plan mode parameter
   if (opts.planMode) params.append('mode', 'plan');
+  
+  // Add lens parameters
+  if (opts.lensImageIds && opts.lensImageIds.length > 0) {
+    params.append('lens_ids', opts.lensImageIds.join(','));
+  }
   
   // Add patch rerank parameters
   if (opts.rerank) {
@@ -88,6 +94,28 @@ export interface FeedbackRequest {
   liked: string[];
   disliked: string[];
   weights_before?: Weights;
+}
+
+export interface LatentPoint {
+  faiss_id: number;
+  image_id: string;
+  project_id: string;
+  x: number;
+  y: number;
+  thumb_url: string;
+  title: string;
+  country: string;
+  typology: string;
+}
+
+export interface LatentPointsResponse {
+  results: LatentPoint[];
+}
+
+export async function getLatentPoints(): Promise<LatentPointsResponse> {
+  const res = await fetch(`${BASE}/latent/points`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
 }
 
 export interface FeedbackResponse {

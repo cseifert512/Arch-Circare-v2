@@ -54,6 +54,7 @@ interface DropQueryProps {
   filters?: FilterOptions;
   weights?: Weights;
   rerank?: PatchRerankOptions;
+  lensImageIds?: string[];
 }
 
 export default function DropQuery({ 
@@ -63,7 +64,8 @@ export default function DropQuery({
   onImageUpload, 
   filters, 
   weights, 
-  rerank 
+  rerank,
+  lensImageIds
 }: DropQueryProps) {
 	const [isDragging, setIsDragging] = useState(false);
 	const [status, setStatus] = useState<string>("");
@@ -90,7 +92,8 @@ export default function DropQuery({
 				strict: false,
 				rerank: rerank?.enabled,
 				reTopK: rerank?.reTopK,
-				planMode
+				planMode,
+				lensImageIds
 			});
 			console.log("Search results:", json);
 			setStatus(`Done. ${json?.results?.length ?? 0} results`);

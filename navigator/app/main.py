@@ -170,6 +170,8 @@ class SearchById(BaseModel):
     filters: Filters = Filters()
     strict: bool = False
     mode: Optional[str] = None
+    lens_ids: Optional[List[str]] = None
+    lens_projects: Optional[List[str]] = None
 
 class SearchByVector(BaseModel):
     vector: List[float]
@@ -194,6 +196,24 @@ def attr_distance(row: dict, f: Filters) -> float:
         return 0.0
     mismatches = sum(1 for ok in checks if not ok)
     return mismatches / len(checks)
+
+def apply_lens(results: List[dict], lens_ids: Optional[List[str]] = None, 
+               lens_projects: Optional[List[str]] = None, top_k: int = 12) -> List[dict]:
+    """Apply neighborhood lens filtering to search results."""
+    if not lens_ids and not lens_projects:
+        return results[:top_k]
+    
+    keep = []
+    lid = set(lens_ids or [])
+    lpr = set(lens_projects or [])
+    
+    for r in results:
+        if (lid and r["image_id"] in lid) or (lpr and r["project_id"] in lpr):
+            keep.append(r)
+        if len(keep) >= top_k:
+            break
+    
+    return keep if keep else results[:top_k]
 
 def fuse_and_sort(results: List[dict], D: np.ndarray, weights: Weights, filters: Filters, 
                  strict: bool = False, query_spatial_features: Optional[List[float]] = None, 
@@ -266,6 +286,18 @@ def fuse_and_sort(results: List[dict], D: np.ndarray, weights: Weights, filters:
 def health():
     return {"ok": True}
 
+@app.get("/latent/points")
+def latent_points():
+    """Get 2-D latent space coordinates for all images."""
+    import pandas as pd
+    p = os.path.join(DATA_DIR, "metadata", "latent_2d.csv")
+    if not os.path.exists(p):
+        return {"results": []}
+    df = pd.read_csv(p)
+    # Handle NaN values by converting to empty strings
+    df = df.fillna("")
+    return {"results": df.to_dict(orient="records")}
+
 @app.post("/admin/reload-index")
 def reload_index():
     try:
@@ -285,8 +317,11 @@ def search_id(body: SearchById):
     # Generate query ID
     query_id = generate_query_id()
     
+    # Determine search k based on lens filtering
+    search_k = max(body.top_k * 5, len(body.lens_ids or []) * 2, len(body.lens_projects or []) * 6, 100)
+    
     t0 = time.time()
-    D, I = st.search(q, body.top_k)
+    D, I = st.search(q, search_k)
     ms = int((time.time() - t0) * 1000)
     hydrated = st.results_payload(D, I)
     
@@ -302,13 +337,22 @@ def search_id(body: SearchById):
                                         query_spatial_features=query_spatial_features, 
                                         store=st)
     
+    # Apply lens filtering
+    lensed_results = apply_lens(fused_results, body.lens_ids, body.lens_projects, body.top_k)
+    
+    # Add lens debug info
+    debug["lens"] = {
+        "ids": len(body.lens_ids or []),
+        "projects": len(body.lens_projects or [])
+    }
+    
     return {
         "query_id": query_id,
         "latency_ms": ms,
         "weights": body.weights.model_dump(),
         "weights_effective": debug["weights_effective"],
         "filters": body.filters.model_dump(),
-        "results": fused_results,
+        "results": lensed_results,
         "debug": debug
     }
 
@@ -377,6 +421,8 @@ async def search_file(
     re_topk: int = 50,
     patches: int = 16,
     mode: Optional[str] = None,
+    lens_ids: Optional[str] = None,
+    lens_projects: Optional[str] = None,
 ):
     st = get_store()
     try:
@@ -384,8 +430,17 @@ async def search_file(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid image file.")
     
-    # Determine search k based on reranking
+    # Parse lens parameters
+    lens_ids_list = None
+    lens_projects_list = None
+    if lens_ids:
+        lens_ids_list = [x.strip() for x in lens_ids.split(",") if x.strip()]
+    if lens_projects:
+        lens_projects_list = [x.strip() for x in lens_projects.split(",") if x.strip()]
+    
+    # Determine search k based on reranking and lens filtering
     search_k = max(top_k, re_topk) if rerank else top_k
+    search_k = max(search_k, top_k * 5, len(lens_ids_list or []) * 2, len(lens_projects_list or []) * 6, 100)
     
     q = embed_pil(pil)
     t0 = time.time()
@@ -432,6 +487,9 @@ async def search_file(
     fused_results, fusion_debug = fuse_and_sort(hydrated, D, w, f, strict=strict, 
                                                query_spatial_features=query_spatial_features, store=st)
     
+    # Apply lens filtering
+    lensed_results = apply_lens(fused_results, lens_ids_list, lens_projects_list, top_k)
+    
     # Apply patch reranking if requested
     debug_info = fusion_debug.copy()
     if rerank:
@@ -442,7 +500,7 @@ async def search_file(
         
         # Rerank results
         reranked_results, rerank_debug = rerank_by_patches(
-            fused_results, query_patches, re_topk, top_k, patches, DATA_DIR
+            lensed_results, query_patches, re_topk, top_k, patches, DATA_DIR
         )
         
         rerank_ms = int((time.time() - rerank_t0) * 1000)
@@ -454,11 +512,17 @@ async def search_file(
         
         final_results = reranked_results
     else:
-        final_results = fused_results[:top_k]
+        final_results = lensed_results
     
     # Combine debug info
     if debug_spatial is not None:
         debug_info["spatial"] = debug_spatial
+    
+    # Add lens debug info
+    debug_info["lens"] = {
+        "ids": len(lens_ids_list or []),
+        "projects": len(lens_projects_list or [])
+    }
     
     # Generate query ID
     query_id = generate_query_id()

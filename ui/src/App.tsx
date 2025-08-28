@@ -7,6 +7,7 @@ import { type Weights } from './components/TriSlider';
 import FilterChips from './components/FilterChips';
 import PatchRerankControls, { type PatchRerankOptions } from './components/PatchRerankControls';
 import TelemetryDisplay from './components/TelemetryDisplay';
+import LatentMap from './components/LatentMap';
 import { getProjectImages, API_BASE, sendFeedback, searchFileWithFilters, type FeedbackRequest } from './lib/api';
 
 interface SearchResult {
@@ -69,6 +70,10 @@ export default function App() {
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   
+  // Lens state
+  const [lensImageIds, setLensImageIds] = useState<string[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>(undefined);
+  
   // Feedback state
   const [feedbackState, setFeedbackState] = useState<Record<string, 'liked' | 'disliked' | undefined>>({});
   const [currentQueryId, setCurrentQueryId] = useState<string | undefined>(undefined);
@@ -88,16 +93,73 @@ export default function App() {
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Save session ID to localStorage
-  useEffect(() => {
-    localStorage.setItem('session_id', sessionId);
-  }, [sessionId]);
-
   // Show toast message
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
     setTimeout(() => setToastMessage(null), 3000);
   }, []);
+
+  // Save session ID to localStorage
+  useEffect(() => {
+    localStorage.setItem('session_id', sessionId);
+  }, [sessionId]);
+
+  // Listen for project selection events
+  useEffect(() => {
+    const handleProjectSelect = (e: any) => {
+      setSelectedProjectId(e.detail.project_id);
+    };
+
+    window.addEventListener('select-project', handleProjectSelect);
+    return () => {
+      window.removeEventListener('select-project', handleProjectSelect);
+    };
+  }, []);
+
+  // Handle lens change
+  const handleLensChange = useCallback(async (imageIds: string[]) => {
+    setLensImageIds(imageIds);
+    
+    // Re-query with new lens if we have a file
+    if (uploadedFile && imageIds.length > 0) {
+      await reQueryWithLens(imageIds);
+    }
+  }, [uploadedFile]);
+
+  // Re-query with lens
+  const reQueryWithLens = useCallback(async (imageIds: string[]) => {
+    if (!uploadedFile) return;
+    
+    setIsLoading(true);
+    try {
+      const planMode = currentWeights.spatial > 0 ? true : undefined;
+      
+      const response = await searchFileWithFilters(uploadedFile, {
+        topK: 12,
+        filters: currentFilters,
+        weights: currentWeights,
+        strict: false,
+        rerank: currentRerank?.enabled,
+        reTopK: currentRerank?.reTopK,
+        planMode,
+        lensImageIds: imageIds
+      });
+      
+      setResults(response.results || []);
+      setLatency(response.latency_ms);
+      setDebugInfo(response.debug);
+      setCurrentQueryId(response.query_id);
+      
+      // Clear feedback state for new results
+      setFeedbackState({});
+      
+    } catch (error) {
+      console.error('Failed to re-query with lens:', error);
+      showToast('Failed to update results with lens filter.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [uploadedFile, currentFilters, currentWeights, currentRerank, showToast]);
 
   // Debounced feedback submission
   const submitFeedback = useCallback(async () => {
@@ -339,12 +401,20 @@ export default function App() {
         filters={currentFilters}
         weights={currentWeights}
         rerank={currentRerank}
+        lensImageIds={lensImageIds}
       />
       
       {/* Telemetry Display */}
       <TelemetryDisplay 
         latency={latency}
         debug={debugInfo}
+      />
+      
+      {/* Latent Map */}
+      <LatentMap 
+        onLensChange={handleLensChange}
+        selectedProjectId={selectedProjectId}
+        lensImageIds={lensImageIds}
       />
       
       {uploadedImageUrl && (

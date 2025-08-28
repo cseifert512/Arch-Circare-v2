@@ -94,3 +94,150 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* Latent Map Styles */
+.latent-map-container {
+  background: #1a1a1a;
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1rem 0;
+  border: 1px solid #333;
+}
+
+.latent-map-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.latent-map-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #fff;
+}
+
+.lens-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.lens-badge {
+  background: #FF4500;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.clear-lens-btn {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.clear-lens-btn:hover {
+  background: #c82333;
+}
+
+.latent-map-canvas-container {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin: 1rem 0;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  transition: border-color 0.2s;
+}
+
+.latent-map-canvas-container.lens-active {
+  border-color: #FF4500;
+}
+
+.latent-map-canvas-container canvas {
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #000;
+}
+
+.tooltip {
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  z-index: 1000;
+  max-width: 200px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.tooltip-title {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.tooltip-details {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+  color: #ccc;
+}
+
+.tooltip-details span {
+  background: #333;
+  padding: 0.1rem 0.3rem;
+  border-radius: 2px;
+}
+
+.latent-map-legend {
+  margin-top: 1rem;
+  padding: 0.5rem;
+  background: #2a2a2a;
+  border-radius: 4px;
+}
+
+.legend-title {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #fff;
+}
+
+.legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  border: 1px solid #444;
+}
+
+.legend-label {
+  font-size: 0.8rem;
+  color: #ccc;
+}
+
+.loading, .error {
+  text-align: center;
+  padding: 2rem;
+  color: #ccc;
+}
+
+.error {
+  color: #ff6b6b;
+}

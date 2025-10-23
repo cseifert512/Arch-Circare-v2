@@ -1,7 +1,7 @@
 services:
   - type: web
     name: arch-circare-api
-    env: python
+    runtime: python
     rootDir: navigator
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
@@ -14,18 +14,20 @@ services:
       - key: ALLOW_PDF
         value: "true"
       - key: ALLOWED_ORIGINS
-        value: "*"
+        fromService:
+          type: web
+          name: arch-circare-ui
+          property: url
       - key: UPLOAD_TMP_DIR
         value: /tmp
 
-  - type: static
+  - type: web
     name: arch-circare-ui
+    runtime: static
     rootDir: ui
     buildCommand: npm ci --no-audit --no-fund && npm run build
-    staticPublishPath: dist
+    startCommand: npx serve -s dist -l $PORT
+    plan: starter
     envVars:
-      - key: VITE_API_BASE
-        fromService:
-          type: web
-          name: arch-circare-api
-          property: url
+      - key: VITE_API_BASE_URL
+      value: https://arch-circare-api.onrender.com

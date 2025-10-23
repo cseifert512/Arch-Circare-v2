@@ -163,7 +163,10 @@ async def _startup_warm():
     def _warm():
         try:
             get_store()
-            get_model_and_transform()
+            # Optionally warm model depending on env
+            disable_warm = os.getenv("DISABLE_MODEL_WARMUP", "false").lower() == "true"
+            if not disable_warm:
+                get_model_and_transform()
             get_session_store()
         except Exception:
             # Avoid crashing startup on warm errors

@@ -14,18 +14,15 @@ services:
       - key: ALLOW_PDF
         value: "true"
       - key: ALLOWED_ORIGINS
-        fromService:
-          type: static_site
-          name: arch-circare-ui
-          property: url
+        value: "*"
       - key: UPLOAD_TMP_DIR
         value: /tmp
 
-  - type: static_site
-    name: arch-circare-ui
+staticSites:
+  - name: arch-circare-ui
     rootDir: ui
     buildCommand: npm ci --no-audit --no-fund && npm run build
-    staticPublishPath: dist
+    publishPath: dist
     envVars:
       - key: VITE_API_BASE
         fromService:

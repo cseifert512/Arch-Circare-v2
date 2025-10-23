@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     host: str = Field(default="0.0.0.0", env="HOST")
     port: int = Field(default=8000, env="PORT")
     debug: bool = Field(default=False, env="DEBUG")
+
+    # Study/beta settings
+    allowed_origins: str = Field(default="*", env="ALLOWED_ORIGINS")  # comma-separated
+    study_token: str | None = Field(default=None, env="STUDY_TOKEN")
+    max_upload_mb: int = Field(default=10, env="MAX_UPLOAD_MB")
+    allow_pdf: bool = Field(default=True, env="ALLOW_PDF")
+    upload_tmp_dir: str = Field(default="/tmp", env="UPLOAD_TMP_DIR")
     
     class Config:
         env_file = ".env"

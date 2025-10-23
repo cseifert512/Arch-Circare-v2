@@ -1,11 +1,23 @@
-const BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000";
+const BASE =
+  (import.meta.env.VITE_API_BASE as string | undefined) ||
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) ||
+  "http://127.0.0.1:8000";
 export const API_BASE = BASE;
+
+const TOKEN: string | undefined = (import.meta.env.VITE_STUDY_TOKEN as string | undefined) || undefined;
+
+function authHeaders(extra?: Record<string, string>): HeadersInit {
+  const h: Record<string, string> = { ...(extra || {}) };
+  if (TOKEN) h["Authorization"] = `Bearer ${TOKEN}`;
+  return h;
+}
 
 export async function searchFile(file: File, topK = 12) {
 	const fd = new FormData();
 	fd.append("file", file);
 	const res = await fetch(`${BASE}/search/file?top_k=${topK}`, {
 		method: "POST",
+		headers: authHeaders(),
 		body: fd,
 	});
 	if (!res.ok) throw new Error(await res.text());
@@ -66,7 +78,49 @@ export async function searchFileWithFilters(file: File, opts: {
   }
   
   const url = `${BASE}/search/file?${params.toString()}`;
-  const res = await fetch(url, { method: 'POST', body: fd });
+  const res = await fetch(url, { method: 'POST', headers: authHeaders(), body: fd });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function uploadQueryImage(file: File, opts: {
+  topK?: number,
+  filters?: FilterOptions,
+  weights?: Weights,
+  planMode?: boolean,
+  lensImageIds?: string[]
+} = {}) {
+  const fd = new FormData();
+  fd.append('file', file);
+  const params = new URLSearchParams();
+  params.append('top_k', (opts.topK ?? 12).toString());
+  if (opts.filters?.typology) params.append('typology', opts.filters.typology);
+  if (opts.filters?.climate_bin) params.append('climate_bin', opts.filters.climate_bin);
+  if (opts.filters?.massing_type) params.append('massing_type', opts.filters.massing_type);
+  if (opts.weights?.visual !== undefined) params.append('w_visual', opts.weights.visual.toString());
+  if (opts.weights?.attr !== undefined) params.append('w_attr', opts.weights.attr.toString());
+  if (opts.weights?.spatial !== undefined) params.append('w_spatial', opts.weights.spatial.toString());
+  if (opts.planMode) params.append('mode', 'plan');
+  if (opts.lensImageIds && opts.lensImageIds.length > 0) {
+    params.append('lens_ids', opts.lensImageIds.join(','));
+  }
+  const url = `${BASE}/upload/query-image?${params.toString()}`;
+  const res = await fetch(url, { method: 'POST', headers: authHeaders(), body: fd });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function uploadExplore(file: File, opts: { topK?: number, weights?: Weights, planMode?: boolean } = {}) {
+  const fd = new FormData();
+  fd.append('file', file);
+  const params = new URLSearchParams();
+  params.append('top_k', (opts.topK ?? 12).toString());
+  if (opts.weights?.visual !== undefined) params.append('w_visual', opts.weights.visual.toString());
+  if (opts.weights?.attr !== undefined) params.append('w_attr', opts.weights.attr.toString());
+  if (opts.weights?.spatial !== undefined) params.append('w_spatial', opts.weights.spatial.toString());
+  if (opts.planMode) params.append('mode', 'plan');
+  const url = `${BASE}/upload/explore?${params.toString()}`;
+  const res = await fetch(url, { method: 'POST', headers: authHeaders(), body: fd });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -83,7 +137,7 @@ export interface ProjectImagesResponse {
 }
 
 export async function getProjectImages(projectId: string): Promise<ProjectImagesResponse> {
-  const res = await fetch(`${BASE}/projects/${encodeURIComponent(projectId)}/images`);
+  const res = await fetch(`${BASE}/projects/${encodeURIComponent(projectId)}/images`, { headers: authHeaders() });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -113,7 +167,7 @@ export interface LatentPointsResponse {
 }
 
 export async function getLatentPoints(): Promise<LatentPointsResponse> {
-  const res = await fetch(`${BASE}/latent/points`);
+  const res = await fetch(`${BASE}/latent/points`, { headers: authHeaders() });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -133,9 +187,7 @@ export interface FeedbackResponse {
 export async function sendFeedback(feedback: FeedbackRequest): Promise<FeedbackResponse> {
   const res = await fetch(`${BASE}/feedback`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(feedback),
   });
   if (!res.ok) throw new Error(await res.text());

@@ -41,3 +41,17 @@ export function clearWeightsFromURL(): void {
   
   window.history.replaceState({}, '', url.toString());
 }
+
+export type StudyPhase = 'scored' | 'scored-upload' | 'explore' | 'none';
+
+export function getStudyPhaseFromURL(): StudyPhase {
+  const urlParams = new URLSearchParams(window.location.search);
+  const phase = urlParams.get('phase') as StudyPhase | null;
+  return (phase ?? 'none');
+}
+
+export function setStudyPhaseInURL(phase: StudyPhase): void {
+  const url = new URL(window.location.href);
+  url.searchParams.set('phase', phase);
+  window.history.replaceState({}, '', url.toString());
+}

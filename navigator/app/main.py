@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -8,11 +8,13 @@ import threading
 import numpy as np
 import torch, timm
 from PIL import Image
+from io import BytesIO
 
 from app.faiss_service import FaissStore, l2n
 from app.patches import compute_query_patches, rerank_by_patches
 from app.session import SessionStore, generate_query_id, compute_weight_nudges, apply_weight_nudges
 from app.models import Feedback, Weights
+from app.config import settings
 
 # Spatial feature computation imports
 try:
@@ -26,15 +28,16 @@ except ImportError:
     SPATIAL_AVAILABLE = False
     print("Warning: skimage/scipy not available, spatial features disabled")
 
-DATA_DIR = os.getenv("DATA_DIR", "data")
+DATA_DIR = settings.data_dir
 app = FastAPI(title="Design Precedent Navigator API", version="0.2.0")
 
-# Enable CORS
+# Enable CORS (tighten to configured origins)
+allowed_origins = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()] or ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
 
 # Serve static assets
@@ -69,6 +72,19 @@ def get_session_store() -> SessionStore:
     if _session_store is None:
         _session_store = SessionStore(DATA_DIR)
     return _session_store
+
+
+def require_token(authorization: str | None = Header(None)):
+    """Simple invite-token gate for study routes.
+    Accepts Authorization: Bearer <token> or no-op if STUDY_TOKEN is unset.
+    """
+    token = settings.study_token
+    if not token:
+        return True
+    provided = (authorization or "").replace("Bearer ", "").strip()
+    if provided != token:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return True
 
 def embed_pil(pil: Image.Image) -> np.ndarray:
     model, tfm = get_model_and_transform()
@@ -282,9 +298,17 @@ def fuse_and_sort(results: List[dict], D: np.ndarray, weights: Weights, filters:
     
     return sorted_results, debug
 
-@app.get("/health")
-def health():
-    return {"ok": True}
+@app.get("/healthz")
+def healthz():
+    # Report readiness after store/model/session are warmed
+    ok = True
+    try:
+        get_store()
+        get_model_and_transform()
+        get_session_store()
+    except Exception:
+        ok = False
+    return {"ok": ok}
 
 @app.get("/latent/points")
 def latent_points():
@@ -307,7 +331,7 @@ def reload_index():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/search/id")
-def search_id(body: SearchById):
+def search_id(body: SearchById, _: bool = Depends(require_token)):
     st = get_store()
     try:
         q = st.vector_for_image(body.image_id)
@@ -357,7 +381,7 @@ def search_id(body: SearchById):
     }
 
 @app.get("/projects")
-def list_projects():
+def list_projects(_: bool = Depends(require_token)):
     """Get all projects with their metadata"""
     store = get_store()
     if store._projects is None or store._projects.empty:
@@ -377,7 +401,7 @@ def list_projects():
     return projects
 
 @app.get("/projects/{project_id}/images")
-def list_project_images(project_id: str):
+def list_project_images(project_id: str, _: bool = Depends(require_token)):
     images_dir = os.path.join(DATA_DIR, "images", project_id)
     if not os.path.isdir(images_dir):
         raise HTTPException(status_code=404, detail=f"Project images not found: {project_id}")
@@ -396,7 +420,7 @@ def list_project_images(project_id: str):
     return {"project_id": project_id, "images": out}
 
 @app.post("/search/vector")
-def search_vector(body: SearchByVector):
+def search_vector(body: SearchByVector, _: bool = Depends(require_token)):
     st = get_store()
     q = np.array(body.vector, dtype="float32")
     if q.ndim != 1:
@@ -423,6 +447,7 @@ async def search_file(
     mode: Optional[str] = None,
     lens_ids: Optional[str] = None,
     lens_projects: Optional[str] = None,
+    _: bool = Depends(require_token),
 ):
     st = get_store()
     try:
@@ -535,6 +560,189 @@ async def search_file(
         "filters": f.model_dump(),
         "results": final_results,
         "debug": debug_info
+    }
+
+# ---- Study-specific upload endpoints ----
+
+def _validate_size(content: bytes):
+    max_bytes = settings.max_upload_mb * 1024 * 1024
+    if len(content) > max_bytes:
+        raise HTTPException(status_code=413, detail=f"File too large. Max {settings.max_upload_mb} MB")
+
+
+@app.post("/upload/query-image")
+async def upload_query_image(
+    file: UploadFile = File(...),
+    top_k: int = 12,
+    typology: Optional[str] = None,
+    climate_bin: Optional[str] = None,
+    massing_type: Optional[str] = None,
+    w_visual: float = 1.0,
+    w_attr: float = 0.25,
+    w_spatial: float = 0.6,
+    strict: bool = False,
+    rerank: bool = False,
+    re_topk: int = 50,
+    patches: int = 16,
+    mode: Optional[str] = None,
+    lens_ids: Optional[str] = None,
+    lens_projects: Optional[str] = None,
+    session_id: Optional[str] = None,
+    _: bool = Depends(require_token),
+):
+    # Validate content type (images only)
+    if file.content_type not in {"image/jpeg", "image/png", "image/jpg"}:
+        raise HTTPException(status_code=415, detail="Only JPG/PNG images are allowed for this task")
+    content = await file.read()
+    _validate_size(content)
+
+    # Open PIL from bytes; no persistence
+    try:
+        pil = Image.open(BytesIO(content))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid image file")
+
+    # Delegate to search logic (same as /search/file)
+    st = get_store()
+
+    # Parse lens parameters
+    lens_ids_list = [x.strip() for x in (lens_ids or "").split(",") if x.strip()] or None
+    lens_projects_list = [x.strip() for x in (lens_projects or "").split(",") if x.strip()] or None
+
+    search_k = max(top_k, re_topk) if rerank else top_k
+    search_k = max(search_k, top_k * 5, len(lens_ids_list or []) * 2, len(lens_projects_list or []) * 6, 100)
+
+    q = embed_pil(pil)
+    t0 = time.time()
+    D, I = st.search(q, search_k)
+    ms = int((time.time() - t0) * 1000)
+    hydrated = st.results_payload(D, I)
+    f = Filters(typology=typology, climate_bin=climate_bin, massing_type=massing_type)
+    w = Weights(visual=w_visual, attr=w_attr, spatial=w_spatial)
+
+    query_spatial_features = None
+    debug_spatial = None
+    if mode == "plan" or mode == "true":
+        query_spatial_features = compute_spatial_features(pil)
+        if query_spatial_features is not None:
+            debug_spatial = {
+                "query_features": {
+                    "elongation": query_spatial_features[0],
+                    "convexity": query_spatial_features[1],
+                    "room_count": query_spatial_features[2],
+                    "corridor_ratio": query_spatial_features[3],
+                },
+                "top_candidates": [],
+            }
+            for i, result in enumerate(hydrated[:3]):
+                if result.get("project_id"):
+                    candidate_features = st.get_spatial_features(result["project_id"])
+                    if candidate_features is not None:
+                        debug_spatial["top_candidates"].append({
+                            "rank": i + 1,
+                            "project_id": result["project_id"],
+                            "features": {
+                                "elongation": candidate_features[0],
+                                "convexity": candidate_features[1],
+                                "room_count": candidate_features[2],
+                                "corridor_ratio": candidate_features[3],
+                            },
+                        })
+
+    fused_results, fusion_debug = fuse_and_sort(
+        hydrated, D, w, f, strict=strict, query_spatial_features=query_spatial_features, store=st
+    )
+    lensed_results = apply_lens(fused_results, lens_ids_list, lens_projects_list, top_k)
+
+    debug_info = fusion_debug.copy()
+    if rerank:
+        rerank_t0 = time.time()
+        query_patches = compute_query_patches(pil, grid=4)
+        reranked_results, rerank_debug = rerank_by_patches(
+            lensed_results, query_patches, re_topk, top_k, patches, DATA_DIR
+        )
+        rerank_ms = int((time.time() - rerank_t0) * 1000)
+        debug_info.update({**rerank_debug, "rerank_latency_ms": rerank_ms, "rerank": "patch_min"})
+        final_results = reranked_results
+    else:
+        final_results = lensed_results
+
+    if debug_spatial is not None:
+        debug_info["spatial"] = debug_spatial
+    debug_info["lens"] = {"ids": len(lens_ids_list or []), "projects": len(lens_projects_list or [])}
+
+    query_id = generate_query_id()
+
+    # No persistence: content is discarded, nothing written to corpus
+    return {
+        "query_id": query_id,
+        "latency_ms": ms,
+        "weights": w.model_dump(),
+        "weights_effective": debug_info.get("weights_effective", {}),
+        "filters": f.model_dump(),
+        "results": final_results,
+        "debug": debug_info,
+    }
+
+
+@app.post("/upload/explore")
+async def upload_explore(
+    file: UploadFile = File(...),
+    top_k: int = 12,
+    w_visual: float = 1.0,
+    w_attr: float = 0.25,
+    w_spatial: float = 0.6,
+    mode: Optional[str] = None,
+    session_id: Optional[str] = None,
+    _: bool = Depends(require_token),
+):
+    # Accept JPG/PNG/PDF; convert PDF first page to image
+    content = await file.read()
+    _validate_size(content)
+
+    pil: Image.Image | None = None
+    if file.content_type in {"image/jpeg", "image/png", "image/jpg"}:
+        try:
+            pil = Image.open(BytesIO(content))
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid image file")
+    elif file.content_type == "application/pdf":
+        if not settings.allow_pdf:
+            raise HTTPException(status_code=415, detail="PDF uploads are disabled")
+        try:
+            import pypdfium2 as pdfium  # type: ignore
+            pdf = pdfium.PdfDocument(BytesIO(content))
+            page = pdf[0]
+            pil = page.render(scale=2).to_pil()
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid PDF file")
+    else:
+        raise HTTPException(status_code=415, detail="Unsupported file type")
+
+    st = get_store()
+    q = embed_pil(pil)
+    t0 = time.time()
+    D, I = st.search(q, top_k)
+    ms = int((time.time() - t0) * 1000)
+    hydrated = st.results_payload(D, I)
+    f = Filters()
+    w = Weights(visual=w_visual, attr=w_attr, spatial=w_spatial)
+
+    query_spatial_features = None
+    if mode == "plan" or mode == "true":
+        query_spatial_features = compute_spatial_features(pil)
+
+    final_results, debug_info = fuse_and_sort(hydrated, D, w, f, strict=False, 
+                                              query_spatial_features=query_spatial_features, store=st)
+    query_id = generate_query_id()
+    return {
+        "query_id": query_id,
+        "latency_ms": ms,
+        "weights": w.model_dump(),
+        "weights_effective": debug_info.get("weights_effective", {}),
+        "filters": f.model_dump(),
+        "results": final_results,
+        "debug": debug_info,
     }
 
 @app.post("/feedback")

@@ -6,18 +6,28 @@ from pathlib import Path
 
 TIMEOUT_SECONDS = 15  # fail fast instead of hanging forever
 MAX_HEALTH_WAIT_SECONDS = 120
+BASE_URL = os.environ.get('API_BASE', 'http://127.0.0.1:8000')
+TOKEN = os.environ.get('STUDY_TOKEN')
 
 
-def wait_for_server(url: str = 'http://127.0.0.1:8000/health') -> bool:
+def _headers(extra: dict | None = None) -> dict:
+    h = dict(extra or {})
+    if TOKEN:
+        h['Authorization'] = f'Bearer {TOKEN}'
+    return h
+
+
+def wait_for_server(url: str | None = None) -> bool:
 	"""Poll the health endpoint until it's up or timeout.
 	Returns True if healthy within the time limit, else False.
 	"""
+    url = url or f'{BASE_URL}/healthz'
 	deadline = time.time() + MAX_HEALTH_WAIT_SECONDS
 	attempt = 0
 	while time.time() < deadline:
 		attempt += 1
 		try:
-			resp = requests.get(url, timeout=5)
+            resp = requests.get(url, timeout=5)
 			if resp.ok:
 				print(f"Health check OK on attempt {attempt}: {resp.json()}")
 				return True
@@ -30,7 +40,7 @@ def wait_for_server(url: str = 'http://127.0.0.1:8000/health') -> bool:
 
 def test_health():
 	try:
-		response = requests.get('http://127.0.0.1:8000/health', timeout=TIMEOUT_SECONDS)
+        response = requests.get(f'{BASE_URL}/healthz', timeout=TIMEOUT_SECONDS)
 		print(f"Health check: {response.status_code} - {response.json()}")
 		return True
 	except Exception as e:
@@ -41,7 +51,7 @@ def test_health():
 def test_search_by_id():
 	try:
 		body = {"image_id": "i_p_test01_hero", "top_k": 5}
-		response = requests.post('http://127.0.0.1:8000/search/id', json=body, timeout=TIMEOUT_SECONDS)
+        response = requests.post(f'{BASE_URL}/search/id', json=body, headers=_headers({'Content-Type': 'application/json'}), timeout=TIMEOUT_SECONDS)
 		print(f"Search by ID: {response.status_code}")
 		if response.status_code == 200:
 			data = response.json()
@@ -63,7 +73,7 @@ def test_search_by_file():
 			return False
 		with open(img_path, 'rb') as f:
 			files = {'file': f}
-			response = requests.post('http://127.0.0.1:8000/search/file?top_k=5', files=files, timeout=TIMEOUT_SECONDS)
+            response = requests.post(f'{BASE_URL}/search/file?top_k=5', files=files, headers=_headers(), timeout=TIMEOUT_SECONDS)
 		print(f"Search by file: {response.status_code}")
 		if response.status_code == 200:
 			data = response.json()
@@ -77,12 +87,50 @@ def test_search_by_file():
 
 def test_reload_index():
 	try:
-		response = requests.post('http://127.0.0.1:8000/admin/reload-index', timeout=TIMEOUT_SECONDS)
+        response = requests.post(f'{BASE_URL}/admin/reload-index', timeout=TIMEOUT_SECONDS)
 		print(f"Reload index: {response.status_code} - {response.json()}")
 		return True
 	except Exception as e:
 		print(f"Reload index failed: {e}")
 		return False
+
+
+def test_upload_query_image():
+    try:
+        img_path = Path('data/images/p_test01/hero.jpg')
+        if not img_path.exists():
+            print(f"Test image not found at {img_path.resolve()}")
+            return False
+        with open(img_path, 'rb') as f:
+            files = {'file': ('hero.jpg', f, 'image/jpeg')}
+            response = requests.post(f'{BASE_URL}/upload/query-image?top_k=5', files=files, headers=_headers(), timeout=TIMEOUT_SECONDS)
+        print(f"Upload query-image: {response.status_code}")
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Latency: {data.get('latency_ms')}ms | Results: {len(data.get('results', []))}")
+        return True
+    except Exception as e:
+        print(f"Upload query-image failed: {e}")
+        return False
+
+
+def test_upload_explore():
+    try:
+        img_path = Path('data/images/p_test01/hero.jpg')
+        if not img_path.exists():
+            print(f"Test image not found at {img_path.resolve()}")
+            return False
+        with open(img_path, 'rb') as f:
+            files = {'file': ('hero.jpg', f, 'image/jpeg')}
+            response = requests.post(f'{BASE_URL}/upload/explore?top_k=5', files=files, headers=_headers(), timeout=TIMEOUT_SECONDS)
+        print(f"Upload explore: {response.status_code}")
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Latency: {data.get('latency_ms')}ms | Results: {len(data.get('results', []))}")
+        return True
+    except Exception as e:
+        print(f"Upload explore failed: {e}")
+        return False
 
 
 if __name__ == "__main__":
@@ -96,17 +144,21 @@ if __name__ == "__main__":
 		os.chdir(expected)
 
 	# Wait for server to be ready instead of blind sleep
-	if not wait_for_server():
+    if not wait_for_server():
 		print("Server not responding. Please make sure the server is running.")
 		raise SystemExit(1)
 
-	# Test health
-	if test_health():
-		# Test search by ID (non-fatal if it fails)
-		test_search_by_id()
+    # Test health
+    if test_health():
+        # Test search by ID (non-fatal if it fails)
+        test_search_by_id()
 
-		# Test search by file
-		test_search_by_file()
+        # Test search by file
+        test_search_by_file()
 
-		# Test reload index
-		test_reload_index()
+        # Test upload endpoints
+        test_upload_query_image()
+        test_upload_explore()
+
+        # Test reload index
+        test_reload_index()

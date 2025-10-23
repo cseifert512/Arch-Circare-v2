@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
-import { searchFileWithFilters, type FilterOptions, type Weights } from "../lib/api";
+import { searchFileWithFilters, uploadQueryImage, uploadExplore, type FilterOptions, type Weights } from "../lib/api";
+import { getStudyPhaseFromURL, type StudyPhase } from "../lib/urlState";
 import { type PatchRerankOptions } from "./PatchRerankControls";
 
 interface SearchResult {
@@ -70,10 +71,17 @@ export default function DropQuery({
 	const [isDragging, setIsDragging] = useState(false);
 	const [status, setStatus] = useState<string>("");
 	const inputRef = useRef<HTMLInputElement>(null);
+  const phase: StudyPhase = getStudyPhaseFromURL();
 
 	const onFiles = useCallback(async (files: FileList | null) => {
 		if (!files || files.length === 0) return;
 		const file = files[0];
+
+    // Enforce gating: uploads disabled in 'scored'; enabled in 'scored-upload' and 'explore'
+    if (phase === 'scored') {
+      setStatus("Uploads are disabled for this task.");
+      return;
+    }
 		try {
 			setStatus("Uploading...");
 			onSearchStart?.();
@@ -84,17 +92,35 @@ export default function DropQuery({
 			
 			// Determine if we should use plan mode based on spatial weight
 			const planMode = weights?.spatial && weights.spatial > 0 ? true : undefined;
-			
-			const json = await searchFileWithFilters(file, {
-				topK: 12,
-				filters,
-				weights,
-				strict: false,
-				rerank: rerank?.enabled,
-				reTopK: rerank?.reTopK,
-				planMode,
-				lensImageIds
-			});
+
+      let json: any;
+      if (phase === 'scored-upload') {
+        json = await uploadQueryImage(file, {
+          topK: 12,
+          filters,
+          weights,
+          planMode,
+          lensImageIds,
+        });
+      } else if (phase === 'explore') {
+        json = await uploadExplore(file, {
+          topK: 12,
+          weights,
+          planMode,
+        });
+      } else {
+        // Fallback to legacy search endpoint
+        json = await searchFileWithFilters(file, {
+          topK: 12,
+          filters,
+          weights,
+          strict: false,
+          rerank: rerank?.enabled,
+          reTopK: rerank?.reTopK,
+          planMode,
+          lensImageIds,
+        });
+      }
 			console.log("Search results:", json);
 			setStatus(`Done. ${json?.results?.length ?? 0} results`);
 			onSearchResults?.(json);
@@ -104,7 +130,7 @@ export default function DropQuery({
 		} finally {
 			onSearchComplete?.();
 		}
-	}, [onSearchStart, onSearchComplete, onSearchResults, onImageUpload, filters, weights, rerank]);
+	}, [onSearchStart, onSearchComplete, onSearchResults, onImageUpload, filters, weights, rerank, phase, lensImageIds]);
 
 	return (
 		<div style={{ display: "grid", gap: 12 }}>
@@ -140,12 +166,12 @@ export default function DropQuery({
 				<input
 					ref={inputRef}
 					type="file"
-					accept="image/*"
+					accept={phase === 'explore' ? "image/*,application/pdf" : "image/*"}
 					onChange={(e) => onFiles(e.target.files)}
 					style={{ display: "none" }}
 				/>
 			</div>
-			<div aria-live="polite" style={{ minHeight: 24 }}>{status}</div>
+			<div aria-live="polite" style={{ minHeight: 24 }}>{status || (phase === 'scored' ? 'Uploads disabled in this task.' : phase === 'explore' ? 'Max 10 MB, JPG/PNG/PDF allowed.' : 'JPG/PNG up to 10 MB.')}</div>
 		</div>
 	);
 }

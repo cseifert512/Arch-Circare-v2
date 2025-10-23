@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: arch-circare-api
+    env: python
+    rootDir: Arch-Circare-v2/navigator
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    plan: starter
+    envVars:
+      - key: DATA_DIR
+        value: ../data
+      - key: MAX_UPLOAD_MB
+        value: "10"
+      - key: ALLOW_PDF
+        value: "true"
+      - key: ALLOWED_ORIGINS
+        fromService:
+          type: static
+          name: arch-circare-ui
+          property: url
+      - key: UPLOAD_TMP_DIR
+        value: /tmp
+
+  - type: static
+    name: arch-circare-ui
+    rootDir: Arch-Circare-v2/ui
+    buildCommand: npm ci --no-audit --no-fund && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE
+        fromService:
+          type: web
+          name: arch-circare-api
+          property: url

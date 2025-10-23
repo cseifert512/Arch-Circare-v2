@@ -18,11 +18,11 @@ services:
       - key: UPLOAD_TMP_DIR
         value: /tmp
 
-staticSites:
-  - name: arch-circare-ui
+  - type: static_site
+    name: arch-circare-ui
     rootDir: ui
     buildCommand: npm ci --no-audit --no-fund && npm run build
-    publishPath: dist
+    staticPublishPath: dist
     envVars:
       - key: VITE_API_BASE
         fromService:

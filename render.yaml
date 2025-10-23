@@ -8,7 +8,7 @@ services:
     plan: starter
     envVars:
       - key: DATA_DIR
-        value: ../data
+        value: data
       - key: MAX_UPLOAD_MB
         value: "10"
       - key: ALLOW_PDF

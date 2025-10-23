@@ -18,7 +18,7 @@ services:
       - key: UPLOAD_TMP_DIR
         value: /tmp
 
-  - type: static_site
+  - type: static
     name: arch-circare-ui
     rootDir: ui
     buildCommand: npm ci --no-audit --no-fund && npm run build

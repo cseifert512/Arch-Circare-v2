@@ -1,5 +1,4 @@
-import React from 'react';
-
+// Feedback controls for each result card
 interface FeedbackButtonsProps {
   imageId: string;
   isLiked?: boolean;

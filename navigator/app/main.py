@@ -40,9 +40,13 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# Serve static assets
-app.mount("/images", StaticFiles(directory=os.path.join(DATA_DIR, "images")), name="images")
-app.mount("/plans", StaticFiles(directory=os.path.join(DATA_DIR, "plans")), name="plans")
+# Serve static assets (only mount if directories exist)
+images_dir = os.path.join(DATA_DIR, "images")
+plans_dir = os.path.join(DATA_DIR, "plans")
+if os.path.isdir(images_dir):
+    app.mount("/images", StaticFiles(directory=images_dir), name="images")
+if os.path.isdir(plans_dir):
+    app.mount("/plans", StaticFiles(directory=plans_dir), name="plans")
 
 # ---- Lazy singletons ----
 _store: FaissStore | None = None

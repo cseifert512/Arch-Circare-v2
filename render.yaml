@@ -22,7 +22,7 @@ services:
 
   - type: web
     name: arch-circare-ui
-    runtime: static
+    env: static
     rootDir: ui
     buildCommand: npm ci --no-audit --no-fund && npm run build
     staticPublishPath: dist

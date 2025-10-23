@@ -30,4 +30,4 @@ services:
     plan: starter
     envVars:
       - key: VITE_API_BASE_URL
-      value: https://arch-circare-api.onrender.com
+        value: https://arch-circare-api.onrender.com

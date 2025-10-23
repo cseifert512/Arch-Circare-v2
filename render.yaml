@@ -14,10 +14,7 @@ services:
       - key: ALLOW_PDF
         value: "true"
       - key: ALLOWED_ORIGINS
-        fromService:
-          type: web
-          name: arch-circare-ui
-          property: url
+        value: "https://arch-circare-ui.onrender.com,http://localhost:5173"
       - key: UPLOAD_TMP_DIR
         value: /tmp
 
@@ -26,8 +23,7 @@ services:
     runtime: static
     rootDir: ui
     buildCommand: npm ci --no-audit --no-fund && npm run build
-    startCommand: npx serve -s dist -l $PORT
-    plan: starter
+    staticPublishPath: dist
     envVars:
       - key: VITE_API_BASE_URL
         value: https://arch-circare-api.onrender.com

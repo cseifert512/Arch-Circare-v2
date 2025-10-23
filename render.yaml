@@ -2,7 +2,7 @@ services:
   - type: web
     name: arch-circare-api
     env: python
-    rootDir: Arch-Circare-v2/navigator
+    rootDir: navigator
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     plan: starter
@@ -23,7 +23,7 @@ services:
 
   - type: static_site
     name: arch-circare-ui
-    rootDir: Arch-Circare-v2/ui
+    rootDir: ui
     buildCommand: npm ci --no-audit --no-fund && npm run build
     staticPublishPath: dist
     envVars:

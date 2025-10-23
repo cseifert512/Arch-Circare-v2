@@ -15,13 +15,13 @@ services:
         value: "true"
       - key: ALLOWED_ORIGINS
         fromService:
-          type: static
+          type: static_site
           name: arch-circare-ui
           property: url
       - key: UPLOAD_TMP_DIR
         value: /tmp
 
-  - type: static
+  - type: static_site
     name: arch-circare-ui
     rootDir: Arch-Circare-v2/ui
     buildCommand: npm ci --no-audit --no-fund && npm run build

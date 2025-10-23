@@ -1,7 +1,7 @@
 services:
   - type: web
     name: arch-circare-api
-    runtime: python
+    env: python
     rootDir: navigator
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
@@ -17,6 +17,8 @@ services:
         value: "https://arch-circare-ui.onrender.com,http://localhost:5173"
       - key: UPLOAD_TMP_DIR
         value: /tmp
+      - key: PYTHON_VERSION
+        value: "3.11.9"
 
   - type: web
     name: arch-circare-ui

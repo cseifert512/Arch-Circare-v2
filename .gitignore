@@ -109,3 +109,8 @@ Thumbs.db
 ui/node_modules
 navigator/.venv
 
+# Context Engineering
+BETA_README.md
+DAY8_COMPLETE_SUMMARY.md
+SPRINT_B_SUMMARY.md
+

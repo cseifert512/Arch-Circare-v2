@@ -1,14 +1,14 @@
 services:
   - type: web
     name: arch-circare-api
-    runtime: python
+    env: python
     rootDir: navigator
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     plan: starter
     envVars:
       - key: DATA_DIR
-        value: ../data
+        value: data
       - key: MAX_UPLOAD_MB
         value: "10"
       - key: ALLOW_PDF
@@ -17,10 +17,14 @@ services:
         value: "https://arch-circare-ui.onrender.com,http://localhost:5173"
       - key: UPLOAD_TMP_DIR
         value: /tmp
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: DISABLE_MODEL_WARMUP
+        value: "true"
 
   - type: web
     name: arch-circare-ui
-    runtime: static
+    env: static
     rootDir: ui
     buildCommand: npm ci --no-audit --no-fund && npm run build
     staticPublishPath: dist

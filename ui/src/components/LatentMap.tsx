@@ -188,7 +188,7 @@ export default function LatentMap({ onLensChange, selectedProjectId, lensImageId
 
     // Update hover tooltip
     const point = findPointAt(x, y, canvas);
-    setHoveredPoint(point);
+    setHoveredPoint(point ?? null);
     if (point) {
       setHoveredPosition({ x, y });
     } else {

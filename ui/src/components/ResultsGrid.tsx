@@ -1,4 +1,5 @@
 import { API_BASE } from '../lib/api';
+// Note: queryId is intentionally not destructured from props to satisfy TS6133
 import FeedbackButtons from './FeedbackButtons';
 
 interface SearchResult {
@@ -117,7 +118,7 @@ function SpatialMetricsTooltip({ projectId, spatialDebug }: {
   );
 }
 
-export default function ResultsGrid({ results, isLoading, latency, debug, onOpenGallery, onFeedback, feedbackState, queryId }: ResultsGridProps) {
+export default function ResultsGrid({ results, isLoading, latency, debug, onOpenGallery, onFeedback, feedbackState }: ResultsGridProps) {
   if (isLoading) {
     return (
       <div style={{ marginTop: 24 }}>

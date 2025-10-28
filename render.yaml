@@ -21,7 +21,7 @@ services:
       - key: PYTHON_VERSION
         value: "3.11.9"
       - key: DISABLE_MODEL_WARMUP
-        value: "false"
+        value: "true"
 
   - type: web
     name: arch-circare-ui

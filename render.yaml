@@ -6,6 +6,7 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     plan: starter
+    healthCheckPath: /healthz
     envVars:
       - key: DATA_DIR
         value: data
@@ -14,13 +15,13 @@ services:
       - key: ALLOW_PDF
         value: "true"
       - key: ALLOWED_ORIGINS
-        value: "https://arch-circare-ui.onrender.com,http://localhost:5173"
+        value: "*"
       - key: UPLOAD_TMP_DIR
         value: /tmp
       - key: PYTHON_VERSION
         value: "3.11.9"
       - key: DISABLE_MODEL_WARMUP
-        value: "true"
+        value: "false"
 
   - type: web
     name: arch-circare-ui

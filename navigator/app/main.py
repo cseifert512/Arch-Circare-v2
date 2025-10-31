@@ -12,7 +12,6 @@ from io import BytesIO
 def l2n(x: np.ndarray) -> np.ndarray:
     n = np.linalg.norm(x, axis=1, keepdims=True) + 1e-12
     return x / n
-from app.patches import compute_query_patches, rerank_by_patches
 from app.session import SessionStore, generate_query_id, compute_weight_nudges, apply_weight_nudges
 from app.models import Feedback, Weights
 from app.config import settings
@@ -524,6 +523,7 @@ async def search_file(
     # Apply patch reranking if requested
     debug_info = fusion_debug.copy()
     if rerank:
+        from app.patches import compute_query_patches, rerank_by_patches
         rerank_t0 = time.time()
         
         # Compute query patches
@@ -662,6 +662,7 @@ async def upload_query_image(
 
     debug_info = fusion_debug.copy()
     if rerank:
+        from app.patches import compute_query_patches, rerank_by_patches
         rerank_t0 = time.time()
         query_patches = compute_query_patches(pil, grid=4)
         reranked_results, rerank_debug = rerank_by_patches(

@@ -2,15 +2,16 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.staticfiles import StaticFiles
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Any
 import os, time
 import threading
 import numpy as np
-import torch, timm
 from PIL import Image
 from io import BytesIO
 
-from app.faiss_service import FaissStore, l2n
+def l2n(x: np.ndarray) -> np.ndarray:
+    n = np.linalg.norm(x, axis=1, keepdims=True) + 1e-12
+    return x / n
 from app.patches import compute_query_patches, rerank_by_patches
 from app.session import SessionStore, generate_query_id, compute_weight_nudges, apply_weight_nudges
 from app.models import Feedback, Weights
@@ -49,20 +50,22 @@ if os.path.isdir(plans_dir):
     app.mount("/plans", StaticFiles(directory=plans_dir), name="plans")
 
 # ---- Lazy singletons ----
-_store: FaissStore | None = None
+_store: Any | None = None
 _model = None
 _transform = None
 _session_store: SessionStore | None = None
 
-def get_store() -> FaissStore:
+def get_store():
     global _store
     if _store is None:
+        from app.faiss_service import FaissStore  # lazy import to avoid loading faiss at import time
         _store = FaissStore(DATA_DIR)
     return _store
 
 def get_model_and_transform():
     global _model, _transform
     if _model is None:
+        import timm  # defer heavy import
         model_name = os.getenv("MODEL_NAME", "vit_small_patch14_dinov2")
         model = timm.create_model(model_name, pretrained=True)
         model.eval(); model.reset_classifier(0)
@@ -91,6 +94,7 @@ def require_token(authorization: str | None = Header(None)):
     return True
 
 def embed_pil(pil: Image.Image) -> np.ndarray:
+    import torch  # defer heavy import
     model, tfm = get_model_and_transform()
     with torch.no_grad():
         x = tfm(pil.convert("RGB")).unsqueeze(0)
@@ -162,10 +166,12 @@ def compute_spatial_features(pil: Image.Image) -> Optional[List[float]]:
 async def _startup_warm():
     def _warm():
         try:
-            get_store()
-            # Optionally warm model depending on env
-            disable_warm = os.getenv("DISABLE_MODEL_WARMUP", "false").lower() == "true"
-            if not disable_warm:
+            disable_index_warm = os.getenv("DISABLE_INDEX_WARMUP", "true").lower() == "true"
+            if not disable_index_warm:
+                get_store()
+            # Optionally warm model depending on env (default disabled on low-memory plans)
+            disable_model_warm = os.getenv("DISABLE_MODEL_WARMUP", "true").lower() == "true"
+            if not disable_model_warm:
                 get_model_and_transform()
             get_session_store()
         except Exception:
@@ -240,7 +246,7 @@ def apply_lens(results: List[dict], lens_ids: Optional[List[str]] = None,
 
 def fuse_and_sort(results: List[dict], D: np.ndarray, weights: Weights, filters: Filters, 
                  strict: bool = False, query_spatial_features: Optional[List[float]] = None, 
-                 store: Optional[FaissStore] = None) -> tuple[List[dict], dict]:
+                 store: Optional[Any] = None) -> tuple[List[dict], dict]:
     """
     Fuse scores using effective weights and return results with debug info.
     Returns: (sorted_results, debug_info)
@@ -307,15 +313,8 @@ def fuse_and_sort(results: List[dict], D: np.ndarray, weights: Weights, filters:
 
 @app.get("/healthz")
 def healthz():
-    # Report readiness after store/model/session are warmed
-    ok = True
-    try:
-        get_store()
-        get_model_and_transform()
-        get_session_store()
-    except Exception:
-        ok = False
-    return {"ok": ok}
+    # Lightweight health check; avoid loading heavy subsystems
+    return {"ok": True}
 
 @app.get("/latent/points")
 def latent_points():

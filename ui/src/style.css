@@ -31,10 +31,9 @@ a:hover {
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
+  background-color: #ffffff; /* ensure light background per Figma */
 }
 
 h1 {
@@ -42,12 +41,7 @@ h1 {
   line-height: 1.1;
 }
 
-#app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
+/* Remove Vite starter container constraints; layout is controlled by page components */
 
 .logo {
   height: 6em;

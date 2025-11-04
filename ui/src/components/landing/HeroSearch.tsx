@@ -6,7 +6,7 @@ export function HeroSearch() {
 
   return (
     <div className="flex flex-col md:flex-row items-stretch gap-3 md:gap-4 justify-center">
-      <div className="relative flex-1 min-w-[280px] max-w-[760px]">
+      <div className="relative w-full md:flex-1 min-w-[320px] md:max-w-[820px]">
         <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={20} aria-hidden="true" />
         <input
           aria-label="Search projects"
@@ -15,7 +15,7 @@ export function HeroSearch() {
         />
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 md:gap-4 shrink-0">
         <button
           type="button"
           onClick={() => fileRef.current?.click()}

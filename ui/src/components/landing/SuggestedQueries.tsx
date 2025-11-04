@@ -8,11 +8,11 @@ export function SuggestedQueries() {
   ];
 
   return (
-    <div className="max-w-[1100px] mx-auto">
+    <div className="max-w-[1200px] md:max-w-[1440px] mx-auto">
       <div className="flex items-center gap-2 text-[13px] text-[var(--text-tertiary)] mb-2">
         <span className="inline-block">Try these searches:</span>
       </div>
-      <div className="flex flex-wrap gap-3 justify-center">
+      <div className="flex flex-wrap gap-3 md:gap-3.5 justify-center">
         {queries.map((q) => (
           <span
             key={q}

@@ -1,4 +1,4 @@
-import { LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Link } from "wouter";
 
 interface SearchCardProps {

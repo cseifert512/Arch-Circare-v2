@@ -1,0 +1,15 @@
+project_id,elongation,convexity,room_count,corridor_ratio
+p_ando_churchlight,1.244,0.978,2,0.024
+p_big_8house,1.413,0.985,1,0.041
+p_corbu_unite,1.206,0.836,9,0.047
+p_demo01,1.479,0.978,2,0.045
+p_demo02,1.493,0.974,1,0.015
+p_kahn_salk,1.28,0.73,1,0.048
+p_kere_gando,1.499,0.87,2,0.027
+p_lacatonfrac,1.339,0.969,2,0.024
+p_mies_barcelona,2.098,0.942,2,0.09
+p_mvrdv_markthal,1.706,0.543,12,0.088
+p_oma_casadamusica,1.414,0.97,1,0.024
+p_sanaa_rolex,1.244,0.319,1,0.013
+p_test01,1.479,0.978,2,0.045
+p_test02,1.493,0.974,1,0.015

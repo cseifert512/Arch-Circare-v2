@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: arch-circare-api
+    env: python
+    rootDir: navigator
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    plan: starter
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATA_DIR
+        value: data
+      - key: MAX_UPLOAD_MB
+        value: "10"
+      - key: ALLOW_PDF
+        value: "true"
+      - key: ALLOWED_ORIGINS
+        value: "*"
+      - key: UPLOAD_TMP_DIR
+        value: /tmp
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: DISABLE_MODEL_WARMUP
+        value: "true"
+      - key: DISABLE_INDEX_WARMUP
+        value: "true"
+
+  - type: web
+    name: arch-circare-ui
+    env: static
+    rootDir: ui-v2
+    buildCommand: npm ci --no-audit --no-fund && npm run build
+    staticPublishPath: build
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://arch-circare-api.onrender.com

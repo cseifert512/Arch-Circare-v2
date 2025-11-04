@@ -21,9 +21,9 @@ services:
   - type: web
     name: arch-circare-ui
     runtime: static
-    rootDir: ui
+    rootDir: Arch-Circare-v2/ui-v2
     buildCommand: npm ci --no-audit --no-fund && npm run build
-    staticPublishPath: dist
+    staticPublishPath: build
     envVars:
       - key: VITE_API_BASE_URL
         value: https://arch-circare-api.onrender.com

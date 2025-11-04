@@ -1,8 +1,35 @@
-# Virtual Environment
-.venv/
-venv/
-env/
-ENV/
+# Node / frontend
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+.parcel-cache/
+.next/
+.vite/
+
+# Build outputs
+build/
+**/build/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# Env
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 
 # Python
 __pycache__/
@@ -12,7 +39,6 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
@@ -60,28 +86,12 @@ celerybeat-schedule
 *.sage.py
 
 # Environments
-.env
-.venv
-env/
+.venv/
 venv/
 ENV/
+env/
 env.bak/
 venv.bak/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
 
 # IDE
 .vscode/
@@ -90,27 +100,6 @@ dmypy.json
 *.swo
 *~
 
-# OS
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Logs
-*.log
-
-# Temporary files
-*.tmp
-*.temp
-
+# Project-specific
 ui/node_modules
 navigator/.venv
-
-# Context Engineering
-BETA_README.md
-DAY8_COMPLETE_SUMMARY.md
-SPRINT_B_SUMMARY.md
-

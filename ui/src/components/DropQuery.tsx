@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { searchFileWithFilters, uploadQueryImage, uploadExplore, type FilterOptions, type Weights } from "../lib/api";
 import { getStudyPhaseFromURL, type StudyPhase } from "../lib/urlState";
 import { type PatchRerankOptions } from "./PatchRerankControls";
@@ -72,6 +72,15 @@ export default function DropQuery({
 	const [status, setStatus] = useState<string>("");
 	const inputRef = useRef<HTMLInputElement>(null);
   const phase: StudyPhase = getStudyPhaseFromURL();
+  
+  // Listen for a global event to open the file dialog from EmptyState CTA
+  useEffect(() => {
+    const handler = () => {
+      inputRef.current?.click();
+    };
+    window.addEventListener('open-file-dialog', handler);
+    return () => window.removeEventListener('open-file-dialog', handler);
+  }, []);
 
 	const onFiles = useCallback(async (files: FileList | null) => {
 		if (!files || files.length === 0) return;

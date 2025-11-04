@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import DropQuery from './components/DropQuery';
-import ResultsGrid from './components/ResultsGrid';
+import FigmaResultsGrid from './components/FigmaResultsGrid';
 import Lightbox from './components/Lightbox';
 import FilterControls, { type FilterOptions } from './components/FilterControls';
 import { type Weights } from './components/TriSlider';
@@ -9,6 +9,7 @@ import PatchRerankControls, { type PatchRerankOptions } from './components/Patch
 import TelemetryDisplay from './components/TelemetryDisplay';
 import LatentMap from './components/LatentMap';
 import { getProjectImages, API_BASE, sendFeedback, searchFileWithFilters, type FeedbackRequest } from './lib/api';
+import { Header } from './figma-ui/src/components/Header';
 
 interface SearchResult {
   rank: number;
@@ -347,13 +348,7 @@ export default function App() {
     setCurrentFilters(newFilters);
   };
 
-  const handleFeedback = (imageId: string, isLiked: boolean) => {
-    // Update local feedback state immediately for responsive UI
-    setFeedbackState(prev => ({
-      ...prev,
-      [imageId]: isLiked ? 'liked' : 'disliked'
-    }));
-  };
+  // Feedback handled implicitly via debounced submission; UI uses Figma cards only
 
   // Cleanup object URL on unmount
   useEffect(() => {
@@ -365,35 +360,29 @@ export default function App() {
   }, [uploadedImageUrl]);
 
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
-      <h1 style={{ 
-        marginBottom: 32, 
-        fontSize: 28, 
-        fontWeight: 700,
-        color: '#111827'
-      }}>
-        Arch-Circare UI
-      </h1>
-      
-      <FilterControls 
+    <div className="min-h-screen bg-white">
+      <Header />
+      <main className="pt-24">
+        <div className="max-w-[1200px] mx-auto px-8">
+          <FilterControls 
         onFiltersChange={handleFiltersChange}
         disabled={isLoading}
         spatialDebug={debugInfo?.spatial}
         effectiveWeights={debugInfo?.weights_effective}
         currentWeights={currentWeights}
-      />
-      
-      <FilterChips 
+          />
+          
+          <FilterChips 
         filters={currentFilters}
         onRemoveFilter={handleRemoveFilter}
-      />
-      
-      <PatchRerankControls
+          />
+          
+          <PatchRerankControls
         onRerankChange={handleRerankChange}
         disabled={isLoading}
-      />
-      
-      <DropQuery 
+          />
+          
+          <DropQuery 
         onSearchStart={handleSearchStart}
         onSearchComplete={handleSearchComplete}
         onSearchResults={handleSearchResults}
@@ -402,106 +391,66 @@ export default function App() {
         weights={currentWeights}
         rerank={currentRerank}
         lensImageIds={lensImageIds}
-      />
-      
-      {/* Telemetry Display */}
-      <TelemetryDisplay 
+          />
+          
+          {/* Telemetry Display */}
+          <TelemetryDisplay 
         latency={latency}
         debug={debugInfo}
-      />
-      
-      {/* Latent Map */}
-      <LatentMap 
+          />
+          
+          {/* Latent Map */}
+          <LatentMap 
         onLensChange={handleLensChange}
         selectedProjectId={selectedProjectId}
         lensImageIds={lensImageIds}
-      />
-      
-      {uploadedImageUrl && (
-        <div style={{ marginBottom: 24 }}>
-          <h3 style={{ 
-            marginBottom: 12, 
-            fontSize: 18, 
-            fontWeight: 600,
-            color: '#374151'
-          }}>
-            Uploaded Image
-          </h3>
-          <div style={{
-            display: 'inline-block',
-            border: '2px solid #e5e7eb',
-            borderRadius: 8,
-            overflow: 'hidden',
-            maxWidth: '300px'
-          }}>
-            <img 
-              src={uploadedImageUrl} 
-              alt="Uploaded image"
-              style={{
-                width: '100%',
-                height: 'auto',
-                display: 'block'
-              }}
-            />
-          </div>
-        </div>
-      )}
-      
-      <ResultsGrid 
+          />
+          
+          {uploadedImageUrl && (
+            <div className="mb-6">
+              <h3 className="mb-3 text-[18px] font-semibold text-[#374151]">
+                Uploaded Image
+              </h3>
+              <div className="inline-block border-2 border-gray-200 rounded-lg overflow-hidden max-w-[300px]">
+                <img 
+                  src={uploadedImageUrl} 
+                  alt="Uploaded image"
+                  className="w-full h-auto block"
+                />
+              </div>
+            </div>
+          )}
+          
+          <FigmaResultsGrid 
         results={results}
         isLoading={isLoading}
-        latency={latency}
-        debug={debugInfo}
         onOpenGallery={openGallery}
-        onFeedback={handleFeedback}
-        feedbackState={feedbackState}
-        queryId={currentQueryId}
-      />
+          />
 
-      {/* Toast Message */}
-      {toastMessage && (
-        <div style={{
-          position: 'fixed',
-          bottom: 24,
-          right: 24,
-          backgroundColor: '#10b981',
-          color: 'white',
-          padding: '12px 16px',
-          borderRadius: 8,
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-          zIndex: 1000,
-          maxWidth: 300,
-          fontSize: 14
-        }}>
-          {toastMessage}
-        </div>
-      )}
+          {/* Toast Message */}
+          {toastMessage && (
+            <div className="fixed bottom-6 right-6 bg-emerald-500 text-white px-4 py-3 rounded-lg shadow-lg z-50 max-w-[300px] text-[14px]">
+              {toastMessage}
+            </div>
+          )}
 
-      {/* Feedback Submission Indicator */}
-      {isSubmittingFeedback && (
-        <div style={{
-          position: 'fixed',
-          top: 24,
-          right: 24,
-          backgroundColor: '#3b82f6',
-          color: 'white',
-          padding: '8px 12px',
-          borderRadius: 6,
-          fontSize: 12,
-          zIndex: 1000
-        }}>
-          Submitting feedback...
-        </div>
-      )}
+          {/* Feedback Submission Indicator */}
+          {isSubmittingFeedback && (
+            <div className="fixed top-6 right-6 bg-blue-500 text-white px-3 py-2 rounded-md text-[12px] z-50">
+              Submitting feedback...
+            </div>
+          )}
 
-      <Lightbox 
+          <Lightbox 
         open={lightboxOpen}
         imageUrls={galleryUrls}
         index={currentIndex}
         onClose={closeGallery}
         onNext={nextImage}
         onPrev={prevImage}
-      />
+          />
+        </div>
+      </main>
     </div>
   );
 }

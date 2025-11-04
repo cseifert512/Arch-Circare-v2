@@ -12,7 +12,7 @@ interface ProjectImagesResponse {
 }
 
 export default function ProjectDetailPage() {
-  const [match, params] = useRoute('/projects/:projectId');
+  const [, params] = useRoute('/projects/:projectId');
   const [, setLocation] = useLocation();
   const projectId = params?.projectId || '';
   const [images, setImages] = useState<string[]>([]);

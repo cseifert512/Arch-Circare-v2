@@ -12,7 +12,7 @@ export default function App() {
         <Route path="/results" component={ResultsPage} />
         <Route path="/projects/:projectId" component={ProjectDetailPage} />
         <Route>
-          {(params) => <div style={{ padding: 24 }}>Not Found</div>}
+          {() => <div style={{ padding: 24 }}>Not Found</div>}
         </Route>
       </Switch>
     </SearchStoreProvider>

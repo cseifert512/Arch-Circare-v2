@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { Header } from '../figma-ui/src/components/Header';
 import { EmptyState } from '../figma-ui/src/components/EmptyState';
@@ -9,7 +9,7 @@ import FigmaResultsGrid from '../components/FigmaResultsGrid';
 export default function ResultsPage() {
   const { search } = useSearchStore();
   const [, setLocation] = useLocation();
-  const [isLoading, setIsLoading] = useState(false);
+  // Loading state is managed by search initiation; results page simply renders stored results
 
   useEffect(() => {
     // If refreshed and store is empty, show empty state
@@ -33,7 +33,7 @@ export default function ResultsPage() {
           ) : (
             <FigmaResultsGrid
               results={search.results as any}
-              isLoading={isLoading}
+              isLoading={false}
               onOpenGallery={(projectId) => setLocation(`/projects/${projectId}`)}
             />
           )}

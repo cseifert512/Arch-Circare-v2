@@ -8,7 +8,7 @@ import { FilterSection } from "../components/FilterSection";
 import { Checkbox } from "../components/ui/checkbox";
 import { Slider } from "../components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { mockProjects, Project } from "../lib/mockData";
+import type { Project } from "../lib/mockData";
 import { useLocation } from "wouter";
 
 const architecturalStyles = [
@@ -50,7 +50,7 @@ export function ResultsPage() {
   const [sortBy, setSortBy] = useState("relevance");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isLoading, setIsLoading] = useState(false);
-  const [projects, setProjects] = useState<Project[]>(mockProjects);
+  const [projects, setProjects] = useState<Project[]>([]);
 
   // Auto-balance dials to 100%
   const handleDialChange = (

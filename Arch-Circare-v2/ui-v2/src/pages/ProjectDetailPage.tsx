@@ -36,48 +36,22 @@ import {
 } from "lucide-react";
 import { Link, useParams } from "wouter";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
-import { mockProjects } from "../lib/mockData";
 
-const projectImages = [
-  { url: "https://images.unsplash.com/photo-1758611228434-7b5b697abd0a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080", caption: "Main entrance", credit: "Photo: Iwan Baan", type: "Exterior view" },
-  { url: "https://images.unsplash.com/photo-1724878019526-91926d24add4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080", caption: "Classroom interior", credit: "Photo: Iwan Baan", type: "Interior view" },
-  { url: "https://images.unsplash.com/photo-1543364972-12a04a63ce01?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080", caption: "Central courtyard", credit: "Photo: Iwan Baan", type: "Exterior view" },
-  { url: "https://images.unsplash.com/photo-1692719224629-317d0bd533f7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080", caption: "Facade detail", credit: "Photo: Iwan Baan", type: "Detail" },
-  { url: "https://images.unsplash.com/photo-1598897270268-f7091c801c3d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080", caption: "Stairwell", credit: "Photo: Iwan Baan", type: "Interior view" },
-  { url: "https://images.unsplash.com/photo-1610650394144-a778795cf585?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080", caption: "Library space", credit: "Photo: Iwan Baan", type: "Interior view" },
-];
+const projectImages: { url?: string; caption?: string; credit?: string; type?: string }[] = [];
 
-const communityContributions = [
-  {
-    id: 1,
-    user: "Sarah Chen",
-    role: "Architect",
-    verified: true,
-    timestamp: "2 weeks ago",
-    type: "Construction photo",
-    content: "I worked on this project - here's a photo of the facade mock-up during construction",
-    upvotes: 23,
-    downvotes: 1,
-    comments: 5
-  },
-  {
-    id: 2,
-    user: "Michael Torres",
-    role: "Building Operator",
-    verified: false,
-    timestamp: "5 days ago",
-    type: "Performance data",
-    content: "The geothermal system has reduced energy costs by 35% compared to our old building",
-    upvotes: 18,
-    downvotes: 0,
-    comments: 3
-  }
-];
+const communityContributions: any[] = [];
 
 export function ProjectDetailPage() {
   const params = useParams();
-  const projectId = params.id || "1";
-  const project = mockProjects.find(p => p.id === projectId) || mockProjects[0];
+  const projectId = params.id || "";
+  const project = {
+    id: projectId,
+    name: "",
+    architect: "",
+    location: "",
+    year: "",
+    buildingType: "",
+  } as const;
   
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isBookmarked, setIsBookmarked] = useState(false);
@@ -86,7 +60,7 @@ export function ProjectDetailPage() {
   const [isContributionModalOpen, setIsContributionModalOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("overview");
 
-  const completeness = 67; // 67% complete
+  const completeness = 0;
   
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % projectImages.length);
@@ -96,7 +70,7 @@ export function ProjectDetailPage() {
     setCurrentImageIndex((prev) => (prev - 1 + projectImages.length) % projectImages.length);
   };
 
-  const currentImage = projectImages[currentImageIndex];
+  const currentImage = projectImages[currentImageIndex] || ({} as any);
 
   const sections = [
     { id: "overview", label: "Overview", complete: true },
@@ -175,51 +149,71 @@ export function ProjectDetailPage() {
           <section className="mb-8">
             <div className="glass-panel-strong rounded-2xl overflow-hidden" style={{ height: "680px" }}>
               <div className="relative h-[580px]">
-                <ImageWithFallback
-                  src={currentImage.url}
-                  alt={currentImage.caption}
-                  className="w-full h-full object-cover"
-                />
+                {projectImages.length > 0 ? (
+                  <ImageWithFallback
+                    src={currentImage.url}
+                    alt={currentImage.caption}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gray-100 flex items-center justify-center text-[13px] text-[var(--text-tertiary)]">
+                    No images yet
+                  </div>
+                )}
                 
-                <div className="absolute bottom-4 left-4 px-5 py-3 rounded-xl" style={{
-                  background: "rgba(0, 0, 0, 0.6)",
-                  backdropFilter: "blur(12px)"
-                }}>
-                  <p className="text-white text-[12px]">{currentImage.credit}</p>
-                  <p className="text-white/80 text-[12px]">{currentImage.type}</p>
-                </div>
+                {projectImages.length > 0 && (
+                  <div className="absolute bottom-4 left-4 px-5 py-3 rounded-xl" style={{
+                    background: "rgba(0, 0, 0, 0.6)",
+                    backdropFilter: "blur(12px)"
+                  }}>
+                    <p className="text-white text-[12px]">{currentImage.credit}</p>
+                    <p className="text-white/80 text-[12px]">{currentImage.type}</p>
+                  </div>
+                )}
 
-                <div className="absolute bottom-4 right-4 glass-panel px-3 py-1.5 rounded-full">
-                  <p className="text-[12px] font-medium">{currentImageIndex + 1} / {projectImages.length}</p>
-                </div>
+                {projectImages.length > 0 && (
+                  <div className="absolute bottom-4 right-4 glass-panel px-3 py-1.5 rounded-full">
+                    <p className="text-[12px] font-medium">{currentImageIndex + 1} / {projectImages.length}</p>
+                  </div>
+                )}
 
-                <button
-                  onClick={prevImage}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 glass-button w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/90"
-                >
-                  <ChevronLeft size={20} />
-                </button>
-                <button
-                  onClick={nextImage}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 glass-button w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/90"
-                >
-                  <ChevronRight size={20} />
-                </button>
+                {projectImages.length > 0 && (
+                  <>
+                    <button
+                      onClick={prevImage}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 glass-button w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/90"
+                    >
+                      <ChevronLeft size={20} />
+                    </button>
+                    <button
+                      onClick={nextImage}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 glass-button w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/90"
+                    >
+                      <ChevronRight size={20} />
+                    </button>
+                  </>
+                )}
               </div>
 
-              <div className="h-[100px] px-4 py-2 flex gap-2 overflow-x-auto">
-                {projectImages.map((img, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setCurrentImageIndex(idx)}
-                    className={`flex-shrink-0 w-[120px] h-[80px] rounded-lg overflow-hidden transition-all ${
-                      idx === currentImageIndex ? "ring-2 ring-[var(--primary-blue)] scale-105" : "opacity-60 hover:opacity-100"
-                    }`}
-                  >
-                    <ImageWithFallback src={img.url} alt={img.caption} className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
+              {projectImages.length > 0 ? (
+                <div className="h-[100px] px-4 py-2 flex gap-2 overflow-x-auto">
+                  {projectImages.map((img, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setCurrentImageIndex(idx)}
+                      className={`flex-shrink-0 w-[120px] h-[80px] rounded-lg overflow-hidden transition-all ${
+                        idx === currentImageIndex ? "ring-2 ring-[var(--primary-blue)] scale-105" : "opacity-60 hover:opacity-100"
+                      }`}
+                    >
+                      <ImageWithFallback src={img.url} alt={img.caption} className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="h-[100px] px-4 py-2 flex items-center justify-center text-[12px] text-[var(--text-tertiary)]">
+                  No thumbnails yet
+                </div>
+              )}
             </div>
           </section>
 
@@ -230,24 +224,24 @@ export function ProjectDetailPage() {
                 <div className="glass-button inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[13px] text-[var(--text-secondary)] mb-4">
                   <Link href="/results" className="hover:text-[var(--primary-blue)]">Search Results</Link>
                   <span>›</span>
-                  <span className="text-[var(--text-primary)]">{project.name}</span>
+                  <span className="text-[var(--text-primary)]">{project.name || "Project"}</span>
                 </div>
                 
                 <h1 className="text-[32px] font-bold text-[var(--text-primary)] mb-2">
-                  {project.name}
+                  {project.name || "Untitled Project"}
                 </h1>
                 <a href="#" className="text-[16px] font-medium text-[var(--primary-blue)] hover:underline mb-3 inline-block">
-                  {project.architect}
+                  {project.architect || "Architect"}
                 </a>
                 
                 <div className="flex items-center gap-4 text-[14px] text-[var(--text-secondary)]">
                   <div className="flex items-center gap-1">
                     <MapPin size={16} />
-                    <span>{project.location}</span>
+                    <span>{project.location || "Location"}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Calendar size={16} />
-                    <span>{project.year}</span>
+                    <span>{project.year || "Year"}</span>
                   </div>
                 </div>
               </div>
@@ -256,7 +250,7 @@ export function ProjectDetailPage() {
                 <button className="glass-button px-6 py-2.5 rounded-lg text-[var(--primary-blue)] text-[14px] font-medium hover:bg-[var(--primary-blue)] hover:text-white transition-all">
                   View all drawings
                 </button>
-                <button className="glass-button px-6 py-2.5 rounded-lg text-[var(--text-secondary)] text-[14px] font-medium hover:bg-white/90 transition-all flex items-center gap-2">
+                <button className="glass-button px-6 py-2.5 rounded-lg text-[var(--text-secondary)] text-[14px] font-medium hover:bg-white/90 transition-all flex items-center gap-2" disabled>
                   <Download size={16} />
                   Download info
                 </button>
@@ -367,21 +361,21 @@ export function ProjectDetailPage() {
                 
                 <div className="grid grid-cols-2 gap-x-8 gap-y-4">
                   {[
-                    { label: "Location", value: "Manhattan, New York, NY, USA", status: "verified", source: "Public records, verified 2024" },
-                    { label: "Status", value: <span className="glass-button inline-block px-3 py-1 rounded-full text-[13px] text-[var(--secondary-green)]">Built</span>, status: "verified" },
-                    { label: "Completion Year", value: project.year, status: "verified", source: "Architect verified" },
-                    { label: "Budget", value: "$12.5M USD", status: "sourced", source: "Architectural Record, May 2024" },
-                    { label: "Project Type", value: project.buildingType, status: "verified" },
-                    { label: "Climate Zone", value: "Humid Subtropical", status: "verified" },
-                    { label: "Site Area", value: "2,400 m² (25,833 sq ft)", status: "sourced", source: "Public permit records" },
-                    { label: "Certification", value: <span className="glass-button inline-block px-3 py-1 rounded-full text-[13px] text-[var(--secondary-green)]">LEED Gold</span>, status: "verified" },
-                    { label: "Building Area", value: "3,200 m² (34,445 sq ft)", status: "sourced", source: "Public permit records" },
-                    { label: "Floors", value: "4 stories + basement", status: "verified" },
+                    { label: "Location", value: project.location || "—", status: "pending" },
+                    { label: "Status", value: <span className="glass-button inline-block px-3 py-1 rounded-full text-[13px]">—</span>, status: "pending" },
+                    { label: "Completion Year", value: project.year || "—", status: "pending" },
+                    { label: "Budget", value: "—", status: "pending" },
+                    { label: "Project Type", value: project.buildingType || "—", status: "pending" },
+                    { label: "Climate Zone", value: "—", status: "pending" },
+                    { label: "Site Area", value: "—", status: "pending" },
+                    { label: "Certification", value: <span className="glass-button inline-block px-3 py-1 rounded-full text-[13px]">—</span>, status: "pending" },
+                    { label: "Building Area", value: "—", status: "pending" },
+                    { label: "Floors", value: "—", status: "pending" },
                   ].map((item, idx) => (
                     <div key={idx}>
                       <div className="flex items-center gap-2 mb-1">
                         <p className="text-[13px] font-medium text-[var(--text-secondary)]">{item.label}</p>
-                        <DataQualityIndicator type={item.status as any} source={item.source} />
+                        <DataQualityIndicator type={item.status as any} />
                       </div>
                       <div className="text-[14px] text-[var(--text-primary)]">{item.value}</div>
                     </div>
@@ -394,65 +388,30 @@ export function ProjectDetailPage() {
                 <h2 className="text-[20px] font-semibold mb-1">Design Narrative</h2>
                 <div className="h-px bg-gradient-to-r from-[var(--border-color)] to-transparent mb-6"></div>
                 
-                <div className="space-y-6">
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-[16px] font-semibold">Architect's Statement</h3>
-                      <span className="glass-button px-2 py-1 rounded-full text-[11px] text-[var(--primary-blue)] flex items-center gap-1">
-                        <CheckCircle size={12} />
-                        Architect verified
-                      </span>
-                    </div>
-                    <div className="space-y-4 max-w-[680px]">
-                      <p className="text-[15px] leading-[26px] text-[var(--text-primary)] opacity-80">
-                        The Buckley School addition responds to the historic fabric of the Upper East Side while creating modern learning environments. The design preserves the landmark facade while introducing a contemporary intervention that respects the neighborhood's architectural character.
-                      </p>
-                      <p className="text-[15px] leading-[26px] text-[var(--text-primary)] opacity-80">
-                        Our approach integrates sustainable design principles with the school's educational mission, creating flexible spaces that foster collaboration and creativity.
-                      </p>
-                      <p className="text-[12px] italic text-[var(--text-secondary)]">— Rob Rogers, FAIA</p>
-                    </div>
-                  </div>
-                </div>
+                <EmptyState
+                  icon={FileText}
+                  title="Design narrative not provided"
+                  description="Add the architect's statement and project description."
+                  actionLabel="Add narrative"
+                  onAction={() => setIsContributionModalOpen(true)}
+                />
               </section>
 
               {/* Financial Data */}
               <section id="financial" className="glass-panel rounded-2xl p-8">
                 <div className="flex items-center justify-between mb-1">
                   <h2 className="text-[20px] font-semibold">Financial & Economic Data</h2>
-                  <span className="glass-button px-2 py-1 rounded-full text-[11px] text-[var(--tertiary-orange)]">40% complete</span>
+                  <span className="glass-button px-2 py-1 rounded-full text-[11px] text-[var(--tertiary-orange)]">0% complete</span>
                 </div>
                 <div className="h-px bg-gradient-to-r from-[var(--border-color)] to-transparent mb-6"></div>
                 
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-[16px] font-semibold mb-3 flex items-center gap-2">
-                      Project Costs
-                      <DataQualityIndicator type="sourced" source="Press reports, unverified" />
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                      <div className="glass-button p-4 rounded-xl">
-                        <p className="text-[13px] text-[var(--text-secondary)] mb-1">Total Cost</p>
-                        <p className="text-[24px] font-bold text-[var(--text-primary)]">$12.5M</p>
-                      </div>
-                      <div className="glass-button p-4 rounded-xl">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="text-[13px] text-[var(--text-secondary)]">Cost per sq ft</p>
-                          <span className="glass-button px-2 py-0.5 rounded text-[10px] text-[var(--secondary-green)]">Calculated</span>
-                        </div>
-                        <p className="text-[24px] font-bold text-[var(--text-primary)]">$390</p>
-                      </div>
-                    </div>
-                    
-                    <EmptyState
-                      icon={DollarSign}
-                      title="Detailed cost breakdown not available"
-                      description="Typical cost distribution for similar K-12 educational projects: Structure 30%, Envelope 25%, MEP 20%, Interior 15%, Other 10%"
-                      actionLabel="Add cost information"
-                      onAction={() => setIsContributionModalOpen(true)}
-                    />
-                  </div>
-                </div>
+                <EmptyState
+                  icon={DollarSign}
+                  title="Financial data not provided"
+                  description="Add budget and cost metrics when available."
+                  actionLabel="Add financial data"
+                  onAction={() => setIsContributionModalOpen(true)}
+                />
               </section>
 
               {/* Post-Occupancy Performance */}
@@ -493,42 +452,16 @@ export function ProjectDetailPage() {
                 <div className="h-px bg-gradient-to-r from-[var(--border-color)] to-transparent mb-6"></div>
                 
                 <div className="relative">
-                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-8">
-                    <div className="h-full flex">
-                      <div className="h-full bg-[var(--primary-blue)] opacity-70" style={{ width: "15%" }} title="Concept: 3 months" />
-                      <div className="h-full bg-[var(--primary-blue)] opacity-80" style={{ width: "20%" }} title="Design: 9 months" />
-                      <div className="h-full bg-[var(--tertiary-orange)]" style={{ width: "15%" }} title="Permitting: 4 months" />
-                      <div className="h-full bg-[var(--secondary-green)]" style={{ width: "50%" }} title="Construction: 18 months" />
-                    </div>
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-8 flex items-center justify-center text-[12px] text-[var(--text-tertiary)]">
+                    Timeline not provided
                   </div>
 
-                  <div className="space-y-3">
-                    {[
-                      { label: "Design start", date: "Jan 2022", verified: true },
-                      { label: "Permit submitted", date: "Dec 2022", verified: true },
-                      { label: "Groundbreaking", date: "Apr 2023", verified: true },
-                      { label: "Topping out", date: "Jun 2024", verified: true },
-                      { label: "Substantial completion", date: "Oct 2024", verified: true },
-                    ].map((milestone, idx) => (
-                      <div key={idx} className="flex items-center gap-3">
-                        <CheckCircle size={16} className="text-[var(--secondary-green)]" />
-                        <span className="text-[14px] font-medium">{milestone.label}</span>
-                        <span className="text-[13px] text-[var(--text-secondary)]">{milestone.date}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <div className="space-y-3 text-[12px] text-[var(--text-tertiary)]">No milestones yet</div>
 
-                  <div className="mt-6 space-y-2">
-                    <div className="glass-button p-3 rounded-lg border-l-4 border-red-500">
-                      <p className="text-[13px]"><span className="font-medium">Delay:</span> Permitting delayed 2 months due to LPC review</p>
-                    </div>
-                    <div className="glass-button p-3 rounded-lg border-l-4 border-[var(--secondary-green)]">
-                      <p className="text-[13px]"><span className="font-medium">Success:</span> Construction completed 1 month ahead of schedule</p>
-                    </div>
-                  </div>
+                  <div className="mt-6 text-[12px] text-[var(--text-tertiary)]">No timeline notes</div>
 
                   <div className="mt-4">
-                    <span className="glass-button px-3 py-1.5 rounded-full text-[12px]">Delivery: Design-Bid-Build</span>
+                    <span className="glass-button px-3 py-1.5 rounded-full text-[12px]">Delivery: —</span>
                   </div>
                 </div>
               </section>
@@ -538,46 +471,15 @@ export function ProjectDetailPage() {
                 <h2 className="text-[20px] font-semibold mb-1">Community Contributions</h2>
                 <div className="h-px bg-gradient-to-r from-[var(--border-color)] to-transparent mb-6"></div>
                 
-                <div className="space-y-4">
-                  {communityContributions.map((contrib) => (
-                    <div key={contrib.id} className="glass-button p-4 rounded-xl">
-                      <div className="flex items-start gap-3">
-                        <div className="glass-button w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0">
-                          <Users size={20} />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[14px] font-medium">{contrib.user}</span>
-                            <span className="text-[12px] text-[var(--text-secondary)]">{contrib.role}</span>
-                            {contrib.verified && (
-                              <span className="glass-button px-2 py-0.5 rounded text-[10px] text-[var(--tertiary-orange)]">Verified</span>
-                            )}
-                            <span className="text-[11px] text-[var(--text-tertiary)] ml-auto">{contrib.timestamp}</span>
-                          </div>
-                          <span className="glass-button px-2 py-0.5 rounded-full text-[10px] text-[var(--primary-blue)] inline-block mb-2">
-                            {contrib.type}
-                          </span>
-                          <p className="text-[14px] text-[var(--text-primary)] mb-3">{contrib.content}</p>
-                          <div className="flex items-center gap-4 text-[12px]">
-                            <button className="flex items-center gap-1 hover:text-[var(--primary-blue)]">
-                              <ThumbsUp size={14} />
-                              {contrib.upvotes}
-                            </button>
-                            <button className="flex items-center gap-1 hover:text-red-500">
-                              <ThumbsDown size={14} />
-                              {contrib.downvotes}
-                            </button>
-                            <button className="flex items-center gap-1 hover:text-[var(--primary-blue)]">
-                              <MessageSquare size={14} />
-                              {contrib.comments}
-                            </button>
-                            <button className="ml-auto text-[var(--text-tertiary)] hover:text-red-500">Flag</button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                {communityContributions.length === 0 ? (
+                  <EmptyState
+                    icon={Users}
+                    title="No community insights yet"
+                    description="When contributors share insights, they will appear here."
+                    actionLabel="Share an insight"
+                    onAction={() => setIsContributionModalOpen(true)}
+                  />
+                ) : null}
 
                 <button
                   onClick={() => setIsContributionModalOpen(true)}
@@ -674,25 +576,7 @@ export function ProjectDetailPage() {
               {/* Downloads */}
               <div className="glass-panel rounded-2xl p-6">
                 <h3 className="text-[16px] font-semibold mb-4">Resources</h3>
-                <div className="space-y-2">
-                  {[
-                    { icon: <FileText size={16} />, text: "Project info PDF", available: true },
-                    { icon: <ImageIcon size={16} />, text: "High-res images (24)", available: true },
-                    { icon: <Layers size={16} />, text: "Drawing set", available: false },
-                  ].map((item, idx) => (
-                    <button
-                      key={idx}
-                      disabled={!item.available}
-                      className={`glass-button w-full h-10 rounded-lg flex items-center justify-center gap-2 text-[13px] transition-all ${
-                        item.available ? "hover:bg-white/90" : "opacity-50 cursor-not-allowed"
-                      }`}
-                    >
-                      {item.icon}
-                      {item.text}
-                      {!item.available && <span className="text-[10px] text-gray-400 ml-auto">N/A</span>}
-                    </button>
-                  ))}
-                </div>
+                <div className="space-y-2 text-[12px] text-[var(--text-tertiary)]">No resources available</div>
                 <p className="text-[11px] italic text-[var(--text-tertiary)] mt-3">For academic/research use only</p>
               </div>
 
@@ -710,7 +594,7 @@ export function ProjectDetailPage() {
                 </select>
                 <div className="bg-white/50 p-4 rounded-lg mb-3">
                   <p className="text-[12px] text-[var(--text-primary)] opacity-70">
-                    {project.architect}. {project.name}. {project.year}. Archipedia, archipedia.com/projects/{project.id}. Accessed 30 Oct. 2025.
+                    {project.architect || "Author"}. {project.name || "Project"}. {project.year || "Year"}. Archipedia, archipedia.com/projects/{project.id || "id"}.
                   </p>
                 </div>
                 <button className="glass-button w-full h-9 rounded-lg flex items-center justify-center gap-2 text-[13px] hover:bg-white/90 transition-all">
@@ -722,27 +606,7 @@ export function ProjectDetailPage() {
               {/* Related Projects */}
               <div className="glass-panel rounded-2xl p-6">
                 <h3 className="text-[16px] font-semibold mb-4">Similar Projects</h3>
-                <div className="space-y-4">
-                  {mockProjects.slice(1, 3).map((relatedProject) => (
-                    <Link key={relatedProject.id} href={`/project/${relatedProject.id}`}>
-                      <div className="glass-button rounded-xl overflow-hidden hover:shadow-lg transition-all cursor-pointer">
-                        <ImageWithFallback
-                          src={relatedProject.imageUrl}
-                          alt={relatedProject.name}
-                          className="w-full h-[120px] object-cover"
-                        />
-                        <div className="p-3">
-                          <h4 className="text-[13px] font-semibold line-clamp-2 mb-1">{relatedProject.name}</h4>
-                          <p className="text-[11px] text-[var(--text-secondary)]">{relatedProject.architect}</p>
-                          <span className="inline-block mt-2 px-2 py-0.5 bg-[var(--primary-blue)]/10 text-[var(--primary-blue)] text-[10px] rounded-full">
-                            {relatedProject.matchPercentage}% Match
-                          </span>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-                <a href="#" className="text-[13px] text-[var(--primary-blue)] hover:underline block mt-4">View more →</a>
+                <div className="text-[12px] text-[var(--text-tertiary)]">No similar projects yet</div>
               </div>
             </aside>
           </div>
@@ -774,7 +638,7 @@ export function ProjectDetailPage() {
       <ContributionModal
         isOpen={isContributionModalOpen}
         onClose={() => setIsContributionModalOpen(false)}
-        projectName={project.name}
+        projectName={project.name || "Project"}
       />
     </div>
   );

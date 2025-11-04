@@ -3,6 +3,12 @@ node_modules/
 **/node_modules/
 dist/
 **/dist/
+.next/
+.vite/
+
+# Build outputs
+build/
+**/build/
 .parcel-cache/
 .next/
 .vite/

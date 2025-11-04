@@ -14,12 +14,13 @@ export function SuggestedQueries() {
       </div>
       <div className="flex flex-wrap gap-3 md:gap-3.5 justify-center">
         {queries.map((q) => (
-          <span
+          <button
             key={q}
-            className="px-4 py-2 rounded-full border border-[var(--border-color)] bg-white text-[13px] text-[var(--text-secondary)] hover:bg-gray-50 cursor-pointer"
+            type="button"
+            className="inline-flex items-center h-8 px-4 rounded-full border border-[var(--border-color)] bg-white text-[13px] leading-[1.2] text-[var(--text-secondary)] hover:bg-gray-50"
           >
             {q}
-          </span>
+          </button>
         ))}
       </div>
     </div>

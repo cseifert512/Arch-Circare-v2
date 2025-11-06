@@ -3,6 +3,8 @@ services:
     name: arch-circare-api
     env: python
     rootDir: navigator
+    branch: render-fixes
+    autoDeploy: true
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     plan: starter
@@ -29,8 +31,12 @@ services:
     name: arch-circare-ui
     env: static
     rootDir: ui-v2
+    branch: ui-deploy-test
+    autoDeploy: true
     buildCommand: npm ci --no-audit --no-fund && npm run build
     staticPublishPath: build
     envVars:
       - key: VITE_API_BASE_URL
+        value: https://arch-circare-api.onrender.com
+      - key: VITE_API_BASE
         value: https://arch-circare-api.onrender.com

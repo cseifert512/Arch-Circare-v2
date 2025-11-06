@@ -43,9 +43,43 @@ export function ImageSearchPage() {
     }
   };
 
-  const handleSearch = () => {
-    if (uploadedImage) {
+  const handleSearch = async () => {
+    if (!uploadedImage) return;
+    try {
+      const envAny = (import.meta as any).env || {};
+      const API_BASE = envAny.VITE_API_BASE || envAny.VITE_API_BASE_URL || "http://localhost:8000";
+      // Convert data URL to Blob
+      const res = await fetch(uploadedImage);
+      const blob = await res.blob();
+      const fd = new FormData();
+      fd.append("file", blob, "query.jpg");
+      const r = await fetch(`${API_BASE}/search/file?top_k=24`, { method: "POST", body: fd });
+      if (!r.ok) {
+        console.error("search/file failed", r.status, r.statusText);
+        return;
+      }
+      const data = await r.json();
+      const results = Array.isArray(data.results) ? data.results : [];
+      const distances = results.map((it: any) => Number(it.distance)).filter((n: number) => Number.isFinite(n));
+      const minD = distances.length ? Math.min(...distances) : 0;
+      const maxD = distances.length ? Math.max(...distances) : 1;
+      const denom = Math.max(1e-9, maxD - minD);
+      const items = results.map((it: any) => {
+        const d = Number(it.distance);
+        const pct = Number.isFinite(d) ? Math.round(100 * (1 - (d - minD) / denom)) : undefined;
+        return {
+          id: it.project_id || it.image_id,
+          name: it.title || it.project_id || "",
+          imageUrl: `${API_BASE}${it.thumb_url}`,
+          matchPercentage: pct,
+          keywords: [],
+          nnImageId: it.image_id,
+        };
+      });
+      sessionStorage.setItem("searchResults", JSON.stringify(items));
       setLocation(`/results?type=image`);
+    } catch (e) {
+      // no-op for now
     }
   };
 

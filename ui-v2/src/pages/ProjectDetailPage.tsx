@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Header } from "../components/Header";
 import { DataQualityIndicator } from "../components/DataQualityIndicator";
 import { EmptyState } from "../components/EmptyState";
@@ -37,21 +37,23 @@ import {
 import { Link, useParams } from "wouter";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 
-const projectImages: { url?: string; caption?: string; credit?: string; type?: string }[] = [];
+type ImageItem = { image_id: string; url: string; filename: string };
 
 const communityContributions: any[] = [];
 
 export function ProjectDetailPage() {
   const params = useParams();
   const projectId = params.id || "";
-  const project = {
+  const [title, setTitle] = useState("");
+  const [images, setImages] = useState<ImageItem[]>([]);
+  const [project, _setProject] = useState({
     id: projectId,
     name: "",
     architect: "",
     location: "",
     year: "",
     buildingType: "",
-  } as const;
+  });
   
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isBookmarked, setIsBookmarked] = useState(false);
@@ -70,7 +72,53 @@ export function ProjectDetailPage() {
     setCurrentImageIndex((prev) => (prev - 1 + projectImages.length) % projectImages.length);
   };
 
-  const currentImage = projectImages[currentImageIndex] || ({} as any);
+  const currentImage = images[currentImageIndex] || ({} as any);
+
+  useEffect(() => {
+    const envAny = (import.meta as any).env || {};
+    const API_BASE = envAny.VITE_API_BASE || envAny.VITE_API_BASE_URL || "http://localhost:8000";
+    let cancelled = false;
+
+    const cleanTitle = (s: string) => {
+      // remove leading 'P ' and trailing numeric id (6-8 digits)
+      return s.replace(/^P\s+/, "").replace(/\s\d{6,8}$/, "");
+    };
+
+    async function load() {
+      try {
+        const plist = await fetch(`${API_BASE}/projects`).then((r) => r.json()).catch(() => []);
+        const hit = Array.isArray(plist) ? plist.find((p: any) => p.project_id === projectId) : null;
+        const t = hit?.title ? cleanTitle(String(hit.title)) : projectId;
+        if (!cancelled) {
+          setTitle(t);
+          _setProject((p) => ({ ...p, name: t }));
+        }
+
+        const imagesResp = await fetch(`${API_BASE}/projects/${projectId}/images`).then((r) => r.json());
+        const list: ImageItem[] = Array.isArray(imagesResp.images)
+          ? imagesResp.images.map((im: any) => ({ image_id: im.image_id, url: `${API_BASE}${im.url}`, filename: im.filename }))
+          : [];
+        if (!cancelled) {
+          setImages(list);
+          // Choose preferred image if provided by ResultsPage
+          try {
+            const mapRaw = sessionStorage.getItem("preferredImageIdByProject") || "{}";
+            const map = JSON.parse(mapRaw);
+            const preferred = map[projectId];
+            if (preferred) {
+              const idx = list.findIndex((x) => x.image_id === preferred);
+              if (idx >= 0) setCurrentImageIndex(idx);
+            }
+          } catch {}
+        }
+      } catch {}
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
 
   const sections = [
     { id: "overview", label: "Overview", complete: true },
@@ -149,10 +197,10 @@ export function ProjectDetailPage() {
           <section className="mb-8">
             <div className="glass-panel-strong rounded-2xl overflow-hidden" style={{ height: "680px" }}>
               <div className="relative h-[580px]">
-                {projectImages.length > 0 ? (
+                {images.length > 0 ? (
                   <ImageWithFallback
                     src={currentImage.url}
-                    alt={currentImage.caption}
+                    alt={currentImage.filename}
                     className="w-full h-full object-cover"
                   />
                 ) : (
@@ -161,23 +209,22 @@ export function ProjectDetailPage() {
                   </div>
                 )}
                 
-                {projectImages.length > 0 && (
+                {images.length > 0 && (
                   <div className="absolute bottom-4 left-4 px-5 py-3 rounded-xl" style={{
                     background: "rgba(0, 0, 0, 0.6)",
                     backdropFilter: "blur(12px)"
                   }}>
-                    <p className="text-white text-[12px]">{currentImage.credit}</p>
-                    <p className="text-white/80 text-[12px]">{currentImage.type}</p>
+                    <p className="text-white text-[12px]">{currentImage.filename}</p>
                   </div>
                 )}
 
-                {projectImages.length > 0 && (
+                {images.length > 0 && (
                   <div className="absolute bottom-4 right-4 glass-panel px-3 py-1.5 rounded-full">
-                    <p className="text-[12px] font-medium">{currentImageIndex + 1} / {projectImages.length}</p>
+                    <p className="text-[12px] font-medium">{currentImageIndex + 1} / {images.length}</p>
                   </div>
                 )}
 
-                {projectImages.length > 0 && (
+                {images.length > 0 && (
                   <>
                     <button
                       onClick={prevImage}
@@ -197,7 +244,7 @@ export function ProjectDetailPage() {
 
               {projectImages.length > 0 ? (
                 <div className="h-[100px] px-4 py-2 flex gap-2 overflow-x-auto">
-                  {projectImages.map((img, idx) => (
+                  {images.map((img, idx) => (
                     <button
                       key={idx}
                       onClick={() => setCurrentImageIndex(idx)}
@@ -205,7 +252,7 @@ export function ProjectDetailPage() {
                         idx === currentImageIndex ? "ring-2 ring-[var(--primary-blue)] scale-105" : "opacity-60 hover:opacity-100"
                       }`}
                     >
-                      <ImageWithFallback src={img.url} alt={img.caption} className="w-full h-full object-cover" />
+                      <ImageWithFallback src={img.url} alt={img.filename} className="w-full h-full object-cover" />
                     </button>
                   ))}
                 </div>

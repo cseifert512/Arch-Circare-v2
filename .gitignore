@@ -109,3 +109,6 @@ venv.bak/
 # Project-specific
 ui/node_modules
 navigator/.venv
+navigator/data/**
+!navigator/data/metadata/
+!navigator/data/metadata/projects.csv

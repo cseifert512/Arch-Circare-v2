@@ -8,7 +8,18 @@ import { FilterSection } from "../components/FilterSection";
 import { Checkbox } from "../components/ui/checkbox";
 import { Slider } from "../components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import type { Project } from "../lib/mockData";
+// Minimal shape used by the UI for display
+type Project = {
+  id: string;
+  name: string;
+  imageUrl: string;
+  architect?: string;
+  location?: string;
+  year?: number | string;
+  matchPercentage?: number;
+  keywords?: string[];
+  nnImageId?: string;
+};
 import { useLocation } from "wouter";
 
 const architecturalStyles = [
@@ -51,6 +62,57 @@ export function ResultsPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isLoading, setIsLoading] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
+
+  // Load a simple project gallery from the backend
+  useEffect(() => {
+    // If ImageSearch stored a search result, show that first
+    const cached = sessionStorage.getItem("searchResults");
+    if (cached) {
+      try {
+        const parsed: Project[] = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setProjects(parsed);
+          sessionStorage.removeItem("searchResults");
+          return; // skip gallery load
+        }
+      } catch {}
+    }
+
+    const envAny = (import.meta as any).env || {};
+    const API_BASE = envAny.VITE_API_BASE || envAny.VITE_API_BASE_URL || "http://localhost:8000";
+    let cancelled = false;
+    async function load() {
+      setIsLoading(true);
+      try {
+        const res = await fetch(`${API_BASE}/projects`);
+        const projList: Array<{ project_id: string; title?: string }> = await res.json();
+        const limited = projList.slice(0, 180);
+        const items = await Promise.all(
+          limited.map(async (p) => {
+            const r = await fetch(`${API_BASE}/projects/${p.project_id}/images`);
+            const data = await r.json();
+            const first = (data.images && data.images[0]) || null;
+            return {
+              id: p.project_id,
+              name: p.title || p.project_id,
+              imageUrl: first ? `${API_BASE}${first.url}` : "",
+              matchPercentage: undefined,
+              keywords: [],
+            } as Project;
+          })
+        );
+        if (!cancelled) setProjects(items.filter((x) => x.imageUrl));
+      } catch (e) {
+        if (!cancelled) setProjects([]);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Auto-balance dials to 100%
   const handleDialChange = (
@@ -352,7 +414,20 @@ export function ResultsPage() {
               ) : viewMode === "grid" ? (
                 <div className="grid grid-cols-3 gap-6">
                   {projects.map((project) => (
-                    <ProjectCard key={project.id} {...project} />
+                    <ProjectCard
+                      key={project.id}
+                      {...project}
+                      onCardClick={(id) => {
+                        try {
+                          const mapRaw = sessionStorage.getItem("preferredImageIdByProject") || "{}";
+                          const map = JSON.parse(mapRaw);
+                          if (project.nnImageId) {
+                            map[id] = project.nnImageId;
+                            sessionStorage.setItem("preferredImageIdByProject", JSON.stringify(map));
+                          }
+                        } catch {}
+                      }}
+                    />
                   ))}
                 </div>
               ) : (

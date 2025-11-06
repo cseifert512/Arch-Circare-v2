@@ -12,6 +12,8 @@ services:
     envVars:
       - key: DATA_DIR
         value: data
+      - key: MODEL_NAME
+        value: vit_base_patch14_dinov2
       - key: MAX_UPLOAD_MB
         value: "10"
       - key: ALLOW_PDF

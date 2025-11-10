@@ -52,6 +52,17 @@ export function ResultsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
 
+  // Load results from image search (if any) stored in sessionStorage
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("searchResults");
+      if (raw) {
+        const items = JSON.parse(raw);
+        setProjects(items as unknown as Project[]);
+      }
+    } catch {}
+  }, []);
+
   // Auto-balance dials to 100%
   const handleDialChange = (
     setter: React.Dispatch<React.SetStateAction<number>>,

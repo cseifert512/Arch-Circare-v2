@@ -43,9 +43,45 @@ export function ImageSearchPage() {
     }
   };
 
-  const handleSearch = () => {
-    if (uploadedImage) {
+  const handleSearch = async () => {
+    if (!uploadedImage) return;
+    try {
+      const API_BASE =
+        (import.meta as any).env?.VITE_API_BASE ||
+        (import.meta as any).env?.VITE_API_BASE_URL ||
+        "http://localhost:8000";
+
+      // Convert data URL to Blob
+      const r0 = await fetch(uploadedImage);
+      const blob = await r0.blob();
+
+      const fd = new FormData();
+      fd.append("file", blob, "query.jpg");
+
+      const r = await fetch(`${API_BASE}/search/file?top_k=24`, {
+        method: "POST",
+        body: fd,
+      });
+      const data = await r.json();
+
+      const items = (data.results || []).map((it: any) => ({
+        id: it.project_id || it.image_id,
+        name: it.title || it.project_id || "",
+        architect: it.architect || "",
+        location: it.country || "",
+        year: it.year || "",
+        imageUrl: `${API_BASE}${it.thumb_url || it.url || ""}`,
+        matchPercentage:
+          typeof it.match_percentage === "number"
+            ? Math.round(it.match_percentage)
+            : Math.max(1, Math.min(99, 100 - Math.round(it.distance || 0))),
+        keywords: [],
+      }));
+
+      sessionStorage.setItem("searchResults", JSON.stringify(items));
       setLocation(`/results?type=image`);
+    } catch (e) {
+      // no-op; optionally surface a toast
     }
   };
 

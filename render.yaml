@@ -1,29 +1,44 @@
 services:
   - type: web
     name: arch-circare-api
-    runtime: python
+    env: python
     rootDir: navigator
+    branch: main
+    autoDeploy: true
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port 
     plan: starter
+    healthCheckPath: /healthz
     envVars:
       - key: DATA_DIR
-        value: ../data
+        value: data
+      - key: MODEL_NAME
+        value: vit_base_patch14_dinov2
       - key: MAX_UPLOAD_MB
         value: "10"
       - key: ALLOW_PDF
         value: "true"
       - key: ALLOWED_ORIGINS
-        value: "https://arch-circare-ui.onrender.com,http://localhost:5173"
+        value: "*"
       - key: UPLOAD_TMP_DIR
         value: /tmp
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: DISABLE_MODEL_WARMUP
+        value: "true"
+      - key: DISABLE_INDEX_WARMUP
+        value: "true"
 
   - type: web
     name: arch-circare-ui
-    runtime: static
-    rootDir: Arch-Circare-v2/ui-v2
+    env: static
+    rootDir: ui-v2
+    branch: main
+    autoDeploy: true
     buildCommand: npm ci --no-audit --no-fund && npm run build
     staticPublishPath: build
     envVars:
       - key: VITE_API_BASE_URL
+        value: https://arch-circare-api.onrender.com
+      - key: VITE_API_BASE
         value: https://arch-circare-api.onrender.com

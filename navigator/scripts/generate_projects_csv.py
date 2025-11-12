@@ -1,4 +1,4 @@
-import csv, os, glob, ast
+import csv, os, glob, ast, json
 from pathlib import Path
 
 DATA = Path("data")
@@ -16,12 +16,28 @@ def load_existing():
                 rows[row["project_id"]] = row
     return rows
 
-def default_row(pid, imgs):
+def clean_title(s: str) -> str:
+    # Remove leading 'P ' if present and trailing numeric id (6-8 digits)
+    out = s.strip()
+    if out.startswith("P "):
+        out = out[2:]
+    # strip trailing numeric code
+    parts = out.split()
+    if parts and parts[-1].isdigit() and 6 <= len(parts[-1]) <= 8:
+        parts = parts[:-1]
+    out = " ".join(parts)
+    return out.strip()
+
+def default_row(pid, imgs, meta_title: str | None):
     # map filenames to image_ids (prefix i_ with project_id)
     image_ids = [f"i_{pid}_{Path(p).stem}" for p in imgs]
+    fallback = pid.replace("_"," ")
+    # Title-case the fallback but do not force meta titles
+    title = meta_title if meta_title else fallback.title()
+    title = clean_title(title)
     return {
         "project_id": pid,
-        "title": pid.replace("_"," ").title(),
+        "title": title,
         "country": "unknown",
         "climate_bin": "unknown",
         "typology": "unknown",
@@ -44,8 +60,20 @@ def main():
 
     # merge defaults with existing rows
     merged = {}
+    meta_root = DATA/"metadata"
     for pid, imgs in projects.items():
-        row = existing.get(pid, default_row(pid, imgs))
+        # Try to read metadata JSON for a nicer title
+        meta_title = None
+        meta_path = meta_root/f"{pid}.json"
+        if meta_path.exists():
+            try:
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    meta = json.load(f)
+                meta_title = meta.get("projectTitle") or meta.get("project_title") or None
+            except Exception:
+                meta_title = None
+
+        row = existing.get(pid, default_row(pid, imgs, meta_title))
         # if existing row, update image_ids minimally to include any new files
         try:
             current_ids = set(ast.literal_eval(row.get("image_ids","[]")))
@@ -53,6 +81,9 @@ def main():
             current_ids = set()
         found_ids = {f"i_{pid}_{Path(p).stem}" for p in imgs}
         row["image_ids"] = str(sorted(current_ids.union(found_ids)))
+        # Refresh title from metadata if available
+        if meta_title:
+            row["title"] = clean_title(str(meta_title))
         merged[pid] = row
 
     # write CSV

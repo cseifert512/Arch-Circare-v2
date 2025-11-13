@@ -89,6 +89,8 @@ export function ImageSearchPage() {
         }
         data = await r.json();
       }
+      // Save query image for ResultsPage fallback
+      try { sessionStorage.setItem("queryImage", uploadedImage); } catch {}
       console.log("image search query_id:", data?.query_id);
 
       const items = (data.results || []).map((it: any) => ({

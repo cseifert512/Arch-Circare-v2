@@ -8,7 +8,17 @@ import { FilterSection } from "../components/FilterSection";
 import { Checkbox } from "../components/ui/checkbox";
 import { Slider } from "../components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import type { Project } from "../lib/mockData";
+import React from "react";
+type Project = {
+  id: string;
+  name: string;
+  architect: string;
+  location: string;
+  year: string;
+  imageUrl: string;
+  matchPercentage: number;
+  keywords?: string[];
+};
 import { useLocation } from "wouter";
 
 const architecturalStyles = [
@@ -62,6 +72,72 @@ export function ResultsPage() {
       }
     } catch {}
   }, [location]);
+
+  // Fallback: If type=image and no results yet, perform the search here using saved query image
+  useEffect(() => {
+    const params = new URLSearchParams(location.split("?")[1]);
+    const type = params.get("type") || "";
+    if (type !== "image") return;
+    if (projects.length > 0) return;
+
+    const run = async () => {
+      try {
+        const img = sessionStorage.getItem("queryImage");
+        if (!img) return;
+
+        const API_BASE =
+          (import.meta as any).env?.VITE_API_BASE ||
+          (import.meta as any).env?.VITE_API_BASE_URL ||
+          "http://localhost:8000";
+        const AUTH =
+          (import.meta as any).env?.VITE_API_AUTH_TOKEN ||
+          (import.meta as any).env?.VITE_API_TOKEN ||
+          "";
+        const headers: Record<string, string> = {};
+        if (AUTH) headers["Authorization"] = `Bearer ${AUTH}`;
+
+        let data: any;
+        if (/^https?:\/\/?/i.test(img)) {
+          const url = `${API_BASE}/search/url?top_k=24&url=${encodeURIComponent(img)}&_=${Date.now()}`;
+          const r = await fetch(url, { headers });
+          if (!r.ok) throw new Error(`search/url failed: ${r.status}`);
+          data = await r.json();
+        } else {
+          const r0 = await fetch(img);
+          const blob = await r0.blob();
+          const fd = new FormData();
+          fd.append("file", blob, "query.jpg");
+          const r = await fetch(`${API_BASE}/search/file?top_k=24&_=${Date.now()}`, {
+            method: "POST",
+            headers,
+            body: fd,
+          });
+          if (!r.ok) throw new Error(`search/file failed: ${r.status}`);
+          data = await r.json();
+        }
+
+        const items = (data.results || []).map((it: any) => ({
+          id: it.project_id || it.image_id,
+          name: it.title || it.project_id || "",
+          architect: it.architect || "",
+          location: it.country || "",
+          year: it.year || "",
+          imageUrl: `${API_BASE}${it.thumb_url || it.url || ""}`,
+          matchPercentage:
+            typeof it.match_percentage === "number"
+              ? Math.round(it.match_percentage)
+              : Math.max(1, Math.min(99, 100 - Math.round(it.distance || 0))),
+          keywords: [],
+        }));
+        sessionStorage.setItem("searchResults", JSON.stringify(items));
+        setProjects(items as unknown as Project[]);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    run();
+  }, [location, projects.length]);
 
   // Auto-balance dials to 100%
   const handleDialChange = (

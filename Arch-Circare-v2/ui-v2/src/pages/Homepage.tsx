@@ -165,6 +165,8 @@ export function Homepage() {
           keywords: [],
         }));
 
+        // Save query image for ResultsPage fallback (in case navigation occurs before results land)
+        try { sessionStorage.setItem("queryImage", uploadedImage); } catch {}
         sessionStorage.setItem("searchResults", JSON.stringify(items));
         // Force route change to reload results
         setLocation(`/results?type=image${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ""}&_=${Date.now()}`);

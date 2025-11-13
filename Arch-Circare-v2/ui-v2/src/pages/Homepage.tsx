@@ -109,6 +109,9 @@ export function Homepage() {
     // If we have an uploaded image, perform image search via API
     if (uploadedImage) {
       try {
+        // Clear stale results to avoid showing old data if this search fails
+        try { sessionStorage.removeItem("searchResults"); } catch {}
+
         const API_BASE =
           (import.meta as any).env?.VITE_API_BASE ||
           (import.meta as any).env?.VITE_API_BASE_URL ||
@@ -118,23 +121,33 @@ export function Homepage() {
           (import.meta as any).env?.VITE_API_TOKEN ||
           "";
 
-        // Convert the uploaded image (data URL or http URL) to a Blob
-        const r0 = await fetch(uploadedImage);
-        const blob = await r0.blob();
-
-        const fd = new FormData();
-        fd.append("file", blob, "query.jpg");
-
         const headers: Record<string, string> = {};
         if (AUTH) headers["Authorization"] = `Bearer ${AUTH}`;
 
-        const url = `${API_BASE}/search/file?top_k=24&_=${Date.now()}`;
-        const r = await fetch(url, { method: "POST", headers, body: fd });
-        if (!r.ok) {
-          const text = await r.text().catch(() => "");
-          throw new Error(`Search failed: ${r.status} ${text}`);
+        let data: any;
+        if (/^https?:\/\/?/i.test(uploadedImage)) {
+          // Remote URL: server-side fetch to avoid client CORS
+          const url = `${API_BASE}/search/url?top_k=24&url=${encodeURIComponent(uploadedImage)}&_=${Date.now()}`;
+          const r = await fetch(url, { headers });
+          if (!r.ok) {
+            const text = await r.text().catch(() => "");
+            throw new Error(`Search failed: ${r.status} ${text}`);
+          }
+          data = await r.json();
+        } else {
+          // Data URL / blob URL: upload file
+          const r0 = await fetch(uploadedImage);
+          const blob = await r0.blob();
+          const fd = new FormData();
+          fd.append("file", blob, "query.jpg");
+          const url = `${API_BASE}/search/file?top_k=24&_=${Date.now()}`;
+          const r = await fetch(url, { method: "POST", headers, body: fd });
+          if (!r.ok) {
+            const text = await r.text().catch(() => "");
+            throw new Error(`Search failed: ${r.status} ${text}`);
+          }
+          data = await r.json();
         }
-        const data = await r.json();
         console.log("image search query_id:", data?.query_id);
 
         // Normalize to UI Project shape

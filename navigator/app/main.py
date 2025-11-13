@@ -101,6 +101,26 @@ def embed_pil(pil: Image.Image) -> np.ndarray:
         vec = feat.cpu().numpy().astype("float32")
     return l2n(vec)[0]
 
+def downsample_pil(pil: Image.Image) -> Image.Image:
+    """
+    Quickly downsample large images before embedding to reduce CPU/RAM.
+    Uses bilinear resize for speed. MAX_IMAGE_SIDE env controls longest side.
+    """
+    try:
+        max_side = int(os.getenv("MAX_IMAGE_SIDE", "512"))
+    except Exception:
+        max_side = 512
+    if max_side <= 0:
+        return pil
+    w, h = pil.size
+    longest = max(w, h)
+    if longest <= max_side:
+        return pil
+    scale = max_side / float(longest)
+    new_w = max(1, int(round(w * scale)))
+    new_h = max(1, int(round(h * scale)))
+    return pil.resize((new_w, new_h), resample=Image.BILINEAR)
+
 def compute_spatial_features(pil: Image.Image) -> Optional[List[float]]:
     """Compute spatial features from a plan image."""
     if not SPATIAL_AVAILABLE:
@@ -459,6 +479,11 @@ async def search_file(
         pil = Image.open(file.file)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid image file.")
+    # Downsample early to minimize compute on small instances
+    try:
+        pil = downsample_pil(pil)
+    except Exception:
+        pass
     
     # Parse lens parameters
     lens_ids_list = None
@@ -607,6 +632,11 @@ async def upload_query_image(
         pil = Image.open(BytesIO(content))
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid image file")
+    # Downsample early
+    try:
+        pil = downsample_pil(pil)
+    except Exception:
+        pass
 
     # Delegate to search logic (same as /search/file)
     st = get_store()
@@ -727,6 +757,11 @@ async def upload_explore(
         raise HTTPException(status_code=415, detail="Unsupported file type")
 
     st = get_store()
+    # Downsample early
+    try:
+        pil = downsample_pil(pil)
+    except Exception:
+        pass
     q = embed_pil(pil)
     t0 = time.time()
     D, I = st.search(q, top_k)

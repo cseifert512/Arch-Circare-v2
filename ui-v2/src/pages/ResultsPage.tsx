@@ -63,7 +63,7 @@ export function ResultsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
 
-  // Load a simple project gallery from the backend
+  // Load a simple project gallery from the backend (skip when we're doing image search flow)
   useEffect(() => {
     // If ImageSearch stored a search result, show that first
     const cached = sessionStorage.getItem("searchResults");
@@ -76,6 +76,13 @@ export function ResultsPage() {
           return; // skip gallery load
         }
       } catch {}
+    }
+
+    const paramsNow = new URLSearchParams(location.split("?")[1] || "");
+    const type = paramsNow.get("type") || "";
+    if (type === "image") {
+      // In image search mode, do NOT preload gallery
+      return;
     }
 
     const envAny = (import.meta as any).env || {};
@@ -120,6 +127,8 @@ export function ResultsPage() {
     const type = params.get("type") || "";
     if (type !== "image") return;
     if (projects.length > 0) return;
+    const from = sessionStorage.getItem("fromImageSearch");
+    if (from !== "1") return;
 
     const envAny = (import.meta as any).env || {};
     const API_BASE = envAny.VITE_API_BASE || envAny.VITE_API_BASE_URL || "http://localhost:8000";
@@ -130,6 +139,7 @@ export function ResultsPage() {
     let cancelled = false;
     async function run() {
       try {
+        setIsLoading(true);
         const img = sessionStorage.getItem("queryImage");
         if (!img) return;
 
@@ -164,9 +174,12 @@ export function ResultsPage() {
         if (!cancelled) {
           sessionStorage.setItem("searchResults", JSON.stringify(items));
           setProjects(items);
+          sessionStorage.removeItem("fromImageSearch");
         }
       } catch (err) {
         console.error(err);
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
     }
     run();

@@ -6,6 +6,7 @@ import { Input } from "../components/ui/input";
 export function ImageSearchPage() {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [contextText, setContextText] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [, setLocation] = useLocation();
@@ -44,9 +45,11 @@ export function ImageSearchPage() {
   };
 
   const handleSearch = async () => {
-    if (!uploadedImage) return;
+    if (!uploadedImage || isSearching) return;
     try {
+      setIsSearching(true);
       try { sessionStorage.removeItem("searchResults"); } catch {}
+      try { sessionStorage.setItem("fromImageSearch", "1"); } catch {}
       const envAny = (import.meta as any).env || {};
       const API_BASE = envAny.VITE_API_BASE || envAny.VITE_API_BASE_URL || "http://localhost:8000";
       const AUTH = envAny.VITE_API_AUTH_TOKEN || envAny.VITE_API_TOKEN || "";
@@ -91,6 +94,8 @@ export function ImageSearchPage() {
     } catch (e) {
       console.error(e);
       alert("Image search failed. Please verify API URL/token and try again.");
+    } finally {
+      setIsSearching(false);
     }
   };
 

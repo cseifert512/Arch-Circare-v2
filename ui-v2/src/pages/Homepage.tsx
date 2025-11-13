@@ -100,15 +100,19 @@ const carouselImages = [
 export function Homepage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
   const [currentPlaceholder, setCurrentPlaceholder] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [, setLocation] = useLocation();
 
   const handleSearch = async () => {
+    if (isSearching) return;
     // If we have an uploaded image, perform image search via API
     if (uploadedImage) {
       try {
+        setIsSearching(true);
         try { sessionStorage.removeItem("searchResults"); } catch {}
+        try { sessionStorage.setItem("fromImageSearch", "1"); } catch {}
         const envAny = (import.meta as any).env || {};
         const API_BASE = envAny.VITE_API_BASE || envAny.VITE_API_BASE_URL || "http://localhost:8000";
         const AUTH = envAny.VITE_API_AUTH_TOKEN || envAny.VITE_API_TOKEN || "";
@@ -157,6 +161,8 @@ export function Homepage() {
         console.error(e);
         alert("Image search failed. Please verify API URL/token and try again.");
         return;
+      } finally {
+        setIsSearching(false);
       }
     }
 

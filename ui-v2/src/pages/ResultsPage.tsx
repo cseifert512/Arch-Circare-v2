@@ -114,6 +114,67 @@ export function ResultsPage() {
     };
   }, []);
 
+  // Fallback: If we navigated with type=image and no results were cached, perform the image search here
+  useEffect(() => {
+    const params = new URLSearchParams(location.split("?")[1]);
+    const type = params.get("type") || "";
+    if (type !== "image") return;
+    if (projects.length > 0) return;
+
+    const envAny = (import.meta as any).env || {};
+    const API_BASE = envAny.VITE_API_BASE || envAny.VITE_API_BASE_URL || "http://localhost:8000";
+    const AUTH = envAny.VITE_API_AUTH_TOKEN || envAny.VITE_API_TOKEN || "";
+    const headers: Record<string, string> = {};
+    if (AUTH) headers["Authorization"] = `Bearer ${AUTH}`;
+
+    let cancelled = false;
+    async function run() {
+      try {
+        const img = sessionStorage.getItem("queryImage");
+        if (!img) return;
+
+        let data: any;
+        if (/^https?:\/\/?/i.test(img)) {
+          const url = `${API_BASE}/search/url?top_k=24&url=${encodeURIComponent(img)}&_=${Date.now()}`;
+          const r = await fetch(url, { headers });
+          if (!r.ok) throw new Error(`search/url failed: ${r.status}`);
+          data = await r.json();
+        } else {
+          const r0 = await fetch(img);
+          const blob = await r0.blob();
+          const fd = new FormData();
+          fd.append("file", blob, "query.jpg");
+          const r = await fetch(`${API_BASE}/search/file?top_k=24&_=${Date.now()}`, { method: "POST", headers, body: fd });
+          if (!r.ok) throw new Error(`search/file failed: ${r.status}`);
+          data = await r.json();
+        }
+
+        const items = (data.results || []).map((it: any) => ({
+          id: it.project_id || it.image_id,
+          name: it.title || it.project_id || "",
+          imageUrl: `${API_BASE}${it.thumb_url || it.url || ""}`,
+          matchPercentage:
+            typeof it.match_percentage === "number"
+              ? Math.round(it.match_percentage)
+              : Math.max(1, Math.min(99, 100 - Math.round(Number(it.distance) || 0))),
+          keywords: [],
+          nnImageId: it.image_id,
+        })) as Project[];
+
+        if (!cancelled) {
+          sessionStorage.setItem("searchResults", JSON.stringify(items));
+          setProjects(items);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [location, projects.length]);
+
   // Auto-balance dials to 100%
   const handleDialChange = (
     setter: React.Dispatch<React.SetStateAction<number>>,

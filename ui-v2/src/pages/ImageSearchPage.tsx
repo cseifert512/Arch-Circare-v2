@@ -46,40 +46,51 @@ export function ImageSearchPage() {
   const handleSearch = async () => {
     if (!uploadedImage) return;
     try {
+      try { sessionStorage.removeItem("searchResults"); } catch {}
       const envAny = (import.meta as any).env || {};
       const API_BASE = envAny.VITE_API_BASE || envAny.VITE_API_BASE_URL || "http://localhost:8000";
-      // Convert data URL to Blob
-      const res = await fetch(uploadedImage);
-      const blob = await res.blob();
-      const fd = new FormData();
-      fd.append("file", blob, "query.jpg");
-      const r = await fetch(`${API_BASE}/search/file?top_k=24`, { method: "POST", body: fd });
-      if (!r.ok) {
-        console.error("search/file failed", r.status, r.statusText);
-        return;
+      const AUTH = envAny.VITE_API_AUTH_TOKEN || envAny.VITE_API_TOKEN || "";
+      const headers: Record<string, string> = {};
+      if (AUTH) headers["Authorization"] = `Bearer ${AUTH}`;
+
+      let data: any;
+      if (/^https?:\/\/?/i.test(uploadedImage)) {
+        // Remote URL: server-side fetch to avoid client CORS
+        const url = `${API_BASE}/search/url?top_k=24&url=${encodeURIComponent(uploadedImage)}&_=${Date.now()}`;
+        const r = await fetch(url, { headers });
+        if (!r.ok) throw new Error(`search/url failed: ${r.status}`);
+        data = await r.json();
+      } else {
+        // Data URL: upload to /search/file
+        const res = await fetch(uploadedImage);
+        const blob = await res.blob();
+        const fd = new FormData();
+        fd.append("file", blob, "query.jpg");
+        const r = await fetch(`${API_BASE}/search/file?top_k=24&_=${Date.now()}`, { method: "POST", headers, body: fd });
+        if (!r.ok) throw new Error(`search/file failed: ${r.status}`);
+        data = await r.json();
       }
-      const data = await r.json();
+
+      console.log("image search query_id:", data?.query_id);
       const results = Array.isArray(data.results) ? data.results : [];
-      const distances = results.map((it: any) => Number(it.distance)).filter((n: number) => Number.isFinite(n));
-      const minD = distances.length ? Math.min(...distances) : 0;
-      const maxD = distances.length ? Math.max(...distances) : 1;
-      const denom = Math.max(1e-9, maxD - minD);
-      const items = results.map((it: any) => {
-        const d = Number(it.distance);
-        const pct = Number.isFinite(d) ? Math.round(100 * (1 - (d - minD) / denom)) : undefined;
-        return {
-          id: it.project_id || it.image_id,
-          name: it.title || it.project_id || "",
-          imageUrl: `${API_BASE}${it.thumb_url}`,
-          matchPercentage: pct,
-          keywords: [],
-          nnImageId: it.image_id,
-        };
-      });
+      const items = results.map((it: any) => ({
+        id: it.project_id || it.image_id,
+        name: it.title || it.project_id || "",
+        imageUrl: `${API_BASE}${it.thumb_url || it.url || ""}`,
+        matchPercentage:
+          typeof it.match_percentage === "number"
+            ? Math.round(it.match_percentage)
+            : Math.max(1, Math.min(99, 100 - Math.round(Number(it.distance) || 0))),
+        keywords: [],
+        nnImageId: it.image_id,
+      }));
+
+      try { sessionStorage.setItem("queryImage", uploadedImage); } catch {}
       sessionStorage.setItem("searchResults", JSON.stringify(items));
-      setLocation(`/results?type=image`);
+      setLocation(`/results?type=image&_=${Date.now()}`);
     } catch (e) {
-      // no-op for now
+      console.error(e);
+      alert("Image search failed. Please verify API URL/token and try again.");
     }
   };
 

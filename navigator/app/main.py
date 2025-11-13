@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header, Query
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -8,6 +8,8 @@ import threading
 import numpy as np
 from PIL import Image
 from io import BytesIO
+import requests
+import logging
 
 def l2n(x: np.ndarray) -> np.ndarray:
     n = np.linalg.norm(x, axis=1, keepdims=True) + 1e-12
@@ -30,6 +32,7 @@ except ImportError:
 
 DATA_DIR = settings.data_dir
 app = FastAPI(title="Design Precedent Navigator API", version="0.2.0")
+logger = logging.getLogger("navigator")
 
 # Enable CORS (tighten to configured origins)
 allowed_origins = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()] or ["*"]
@@ -455,6 +458,84 @@ def search_vector(body: SearchByVector, _: bool = Depends(require_token)):
     ms = int((time.time() - t0) * 1000)
     return {"latency_ms": ms, "results": st.results_payload(D, I)}
 
+@app.get("/search/url")
+def search_url(
+    url: str = Query(..., description="Public image URL to search by"),
+    top_k: int = 12,
+    typology: Optional[str] = None,
+    climate_bin: Optional[str] = None,
+    massing_type: Optional[str] = None,
+    w_visual: float = 1.0,
+    w_attr: float = 0.25,
+    w_spatial: float = 0.6,
+    strict: bool = False,
+    rerank: bool = False,
+    re_topk: int = 50,
+    patches: int = 16,
+    mode: Optional[str] = None,
+    lens_ids: Optional[str] = None,
+    lens_projects: Optional[str] = None,
+    _: bool = Depends(require_token),
+):
+    """Search using an image reachable at a URL (server-side fetch)."""
+    st = get_store()
+    try:
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        pil = Image.open(BytesIO(r.content))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch image: {e}")
+
+    # Optional downsample
+    try:
+        pil = downsample_pil(pil)  # type: ignore[name-defined]
+    except Exception:
+        pass
+
+    # Parse lens parameters
+    lens_ids_list = None
+    lens_projects_list = None
+    if lens_ids:
+        lens_ids_list = [x.strip() for x in lens_ids.split(",") if x.strip()]
+    if lens_projects:
+        lens_projects_list = [x.strip() for x in lens_projects.split(",") if x.strip()]
+
+    # Determine search k
+    search_k = max(top_k, re_topk) if rerank else top_k
+    search_k = max(search_k, top_k * 5, len(lens_ids_list or []) * 2, len(lens_projects_list or []) * 6, 100)
+
+    q = embed_pil(pil)
+    t0 = time.time()
+    D, I = st.search(q, search_k)
+    ms = int((time.time() - t0) * 1000)
+    hydrated = st.results_payload(D, I)
+    f = Filters(typology=typology, climate_bin=climate_bin, massing_type=massing_type)
+    w = Weights(visual=w_visual, attr=w_attr, spatial=w_spatial)
+
+    # Spatial (optional)
+    query_spatial_features = None
+    if mode == "plan" or mode == "true":
+        try:
+            query_spatial_features = compute_spatial_features(pil)
+        except Exception:
+            query_spatial_features = None
+
+    fused_results, debug = fuse_and_sort(hydrated, D, w, f, strict=strict,
+                                         query_spatial_features=query_spatial_features, store=st)
+
+    # Lens filter
+    lensed_results = apply_lens(fused_results, lens_ids_list, lens_projects_list, top_k)
+
+    query_id = generate_query_id()
+    return {
+        "query_id": query_id,
+        "latency_ms": ms,
+        "weights": w.model_dump(),
+        "weights_effective": debug.get("weights_effective", {}),
+        "filters": f.model_dump(),
+        "results": lensed_results,
+        "debug": debug
+    }
 @app.post("/search/file")
 async def search_file(
     file: UploadFile = File(...),

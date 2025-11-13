@@ -76,6 +76,7 @@ export function ImageSearchPage() {
         throw new Error(`Search failed: ${r.status} ${text}`);
       }
       const data = await r.json();
+      console.log("image search query_id:", data?.query_id);
 
       const items = (data.results || []).map((it: any) => ({
         id: it.project_id || it.image_id,
@@ -92,7 +93,8 @@ export function ImageSearchPage() {
       }));
 
       sessionStorage.setItem("searchResults", JSON.stringify(items));
-      setLocation(`/results?type=image`);
+      // Force route change so results page reloads even if already on /results
+      setLocation(`/results?type=image&_=${Date.now()}`);
     } catch (e) {
       console.error(e);
       alert("Image search failed. Please verify API URL/token and try again.");

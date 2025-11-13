@@ -9,6 +9,10 @@ import numpy as np
 from PIL import Image
 from io import BytesIO
 import requests
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("navigator")
 
 def l2n(x: np.ndarray) -> np.ndarray:
     n = np.linalg.norm(x, axis=1, keepdims=True) + 1e-12
@@ -496,6 +500,7 @@ def search_url(
     lensed_results = apply_lens(fused_results, lens_ids_list, lens_projects_list, top_k)
 
     query_id = generate_query_id()
+    logger.info(f"/search/url query_id={query_id} url={url} top_k={top_k} latency_ms={ms}")
     return {
         "query_id": query_id,
         "latency_ms": ms,
@@ -627,6 +632,7 @@ async def search_file(
     
     # Generate query ID
     query_id = generate_query_id()
+    logger.info(f"/search/file query_id={query_id} top_k={top_k} latency_ms={ms}")
     
     return {
         "query_id": query_id,
